@@ -102,20 +102,25 @@ function init([ moviesMetaData, moviesKeywords, ratings ]) {
   // Feature Extraction
   let X = movies.map(toFeaturizedMovies(DICTIONARIES));
 
-  const {
-    means,
-    ranges,
-  } = getCoefficients(X);
+  // Extract a couple of valuable cooeficients for operations later on
+  const { means, ranges } = getCoefficients(X);
 
   // Synthesize missing features in movies
   X = synthesizeFeatures(X, means);
 
   // Feature Scaling
+  X = scaleFeatures(X, means, ranges);
 
-  console.log(movies[45331]);
-  console.log(X[45331]);
+  console.log(X[0]);
 }
 
+function scaleFeatures(X, means, ranges) {
+  return X.map((row) => {
+    return row.map((feature, key) => {
+      return (feature - means[key]) / ranges[key];
+    });
+  });
+};
 
 function synthesizeFeatures(X, means) {
   return X.map(movie => {
@@ -210,10 +215,10 @@ function toFeaturizedMovies(dictionaries) {
     featureVector.push(toFeaturizedHomepage(movie));
     featureVector.push(toFeaturizedLanguage(movie));
 
-    // featureVector.push(...toFeaturizedFromDictionary(movie, dictionaries.genresDictionary, 'genres'));
-    // featureVector.push(...toFeaturizedFromDictionary(movie, dictionaries.overviewDictionary, 'overview'));
-    // featureVector.push(...toFeaturizedFromDictionary(movie, dictionaries.studioDictionary, 'studio'));
-    // featureVector.push(...toFeaturizedFromDictionary(movie, dictionaries.keywordsDictionary, 'keywords'));
+    featureVector.push(...toFeaturizedFromDictionary(movie, dictionaries.genresDictionary, 'genres'));
+    featureVector.push(...toFeaturizedFromDictionary(movie, dictionaries.overviewDictionary, 'overview'));
+    featureVector.push(...toFeaturizedFromDictionary(movie, dictionaries.studioDictionary, 'studio'));
+    featureVector.push(...toFeaturizedFromDictionary(movie, dictionaries.keywordsDictionary, 'keywords'));
 
     return featureVector;
   }
