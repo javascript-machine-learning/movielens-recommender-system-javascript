@@ -102,8 +102,13 @@ function init([ moviesMetaData, moviesKeywords, ratings ]) {
   // Feature Extraction
   let X = movies.map(toFeaturizedMovies(DICTIONARIES));
 
+  const {
+    means,
+    // ranges,
+  } = getCoefficients(X);
+
   // Synthesize missing features in movies
-  X = synthesizeFeatures(X);
+  X = synthesizeFeatures(X, means);
 
   // Feature Scaling
 
@@ -113,51 +118,8 @@ function init([ moviesMetaData, moviesKeywords, ratings ]) {
   console.log(X[45331]);
 }
 
-// function scaleFeatures(X) {
-//   const { mins, maxs, sums } = X.reduce((result, movie) => {
-//     let mins
-//   }, {});
-// }
 
-function synthesizeFeatures(X) {
-
-
-  const sumsInit = {
-    budget: 0,
-    popularity: 0,
-    revenue: 0,
-    runtime: 0,
-    voteAverage: 0,
-    voteCount: 0,
-    release: 0
-  };
-
-  const sums = X.reduce((result, value, key) => {
-    // For the sake of simplicity!
-    // Do not filter out 0's before computing mean
-    // Assuming size of gaps is very little relatively seen to data points with features
-
-    return {
-      budget: result.budget + value[0],
-      popularity: result.popularity + value[1],
-      revenue: result.revenue + value[2],
-      runtime: result.runtime + value[3],
-      voteAverage: result.voteAverage + value[4],
-      voteCount: result.voteCount + value[5],
-      release: result.release + value[6],
-    };
-  }, sumsInit);
-
-  const means = {
-    budgetMean: sums.budget / X.length,
-    popularityMean: sums.popularity / X.length,
-    revenueMean: sums.revenue / X.length,
-    runtimeMean: sums.runtime / X.length,
-    voteAverageMean: sums.voteAverage / X.length,
-    voteCountMean: sums.voteCount / X.length,
-    releaseMean: sums.release / X.length,
-  };
-
+function synthesizeFeatures(X, means) {
   return X.map(movie => {
     let [
       budget,
@@ -181,6 +143,78 @@ function synthesizeFeatures(X) {
       ...otherFeatures,
     ];
   });
+}
+
+function getCoefficients(X) {
+  const M = X.length;
+
+  const initCoefficients = {
+    sums: {
+      budget: 0,
+      popularity: 0,
+      revenue: 0,
+      runtime: 0,
+      voteAverage: 0,
+      voteCount: 0,
+      release: 0,
+    },
+    mins: {
+      budget: 0,
+      popularity: 0,
+      revenue: 0,
+      runtime: 0,
+      voteAverage: 0,
+      voteCount: 0,
+      release: 0,
+    },
+    maxs: {
+      budget: 0,
+      popularity: 0,
+      revenue: 0,
+      runtime: 0,
+      voteAverage: 0,
+      voteCount: 0,
+      release: 0,
+    },
+  };
+
+  const helperCoefficients = X.reduce((result, value, key) => {
+    return {
+      sums: {
+        budget: result.sums.budget + value[0],
+        popularity: result.sums.popularity + value[1],
+        revenue: result.sums.revenue + value[2],
+        runtime: result.sums.runtime + value[3],
+        voteAverage: result.sums.voteAverage + value[4],
+        voteCount: result.sums.voteCount + value[5],
+        release: result.sums.release + value[6],
+      },
+      mins: {},
+      maxs: {},
+    };
+  }, initCoefficients);
+
+  const means = {
+    budgetMean: helperCoefficients.sums.budget / M,
+    popularityMean: helperCoefficients.sums.popularity / M,
+    revenueMean: helperCoefficients.sums.revenue / M,
+    runtimeMean: helperCoefficients.sums.runtime / M,
+    voteAverageMean: helperCoefficients.sums.voteAverage / M,
+    voteCountMean: helperCoefficients.sums.voteCount / M,
+    releaseMean: helperCoefficients.sums.release / M,
+  };
+
+  const ranges = {
+  //   budgetRange: coefficients.maxs.budget - coefficients.mins.budget,
+  //   popularityRange: coefficients.maxs.popularity - coefficients.mins.popularity,
+  //   revenueRange: coefficients.maxs.revenue - coefficients.mins.revenue,
+  //   runtimeRange: coefficients.maxs.runtime - coefficients.mins.runtime,
+  //   voteAverageRange: coefficients.maxs.voteAverage - coefficients.mins.voteAverage,
+  //   voteCountRange: coefficients.maxs.voteCount - coefficients.mins.voteCount,
+  //   releaseRange: coefficients.maxs.release - coefficients.mins.release,
+  };
+
+  return { ranges, means };
 }
 
 function toFeaturizedMovies(dictionaries) {
