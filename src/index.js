@@ -104,15 +104,13 @@ function init([ moviesMetaData, moviesKeywords, ratings ]) {
 
   const {
     means,
-    // ranges,
+    ranges,
   } = getCoefficients(X);
 
   // Synthesize missing features in movies
   X = synthesizeFeatures(X, means);
 
   // Feature Scaling
-
-
 
   console.log(movies[45331]);
   console.log(X[45331]);
@@ -133,88 +131,67 @@ function synthesizeFeatures(X, means) {
     ] = movie;
 
     return [
-      budget ? budget : means.budgetMean,
-      popularity ? popularity : means.popularityMean,
-      revenue ? revenue : means.revenueMean,
-      runtime ? runtime : means.runtimeMean,
-      voteAverage ? voteAverage : means.voteAverageMean,
-      voteCount ? voteCount : means.voteCountMean,
-      release ? release : means.releaseMean,
+      budget ? budget : means[0],
+      popularity ? popularity : means[1],
+      revenue ? revenue : means[2],
+      runtime ? runtime : means[3],
+      voteAverage ? voteAverage : means[4],
+      voteCount ? voteCount : means[5],
+      release ? release : means[6],
       ...otherFeatures,
     ];
   });
 }
 
 function getCoefficients(X) {
+  // TODO: Without removing the unsynthesized rows
+  // stretches down all min features to 0?!
   const M = X.length;
 
-  const initCoefficients = {
-    sums: {
-      budget: 0,
-      popularity: 0,
-      revenue: 0,
-      runtime: 0,
-      voteAverage: 0,
-      voteCount: 0,
-      release: 0,
-    },
-    mins: {
-      budget: 0,
-      popularity: 0,
-      revenue: 0,
-      runtime: 0,
-      voteAverage: 0,
-      voteCount: 0,
-      release: 0,
-    },
-    maxs: {
-      budget: 0,
-      popularity: 0,
-      revenue: 0,
-      runtime: 0,
-      voteAverage: 0,
-      voteCount: 0,
-      release: 0,
-    },
+  const initC = {
+    sums: [],
+    mins: [],
+    maxs: [],
   };
 
-  const helperCoefficients = X.reduce((result, value, key) => {
+  const helperC = X.reduce((result, row) => {
     return {
-      sums: {
-        budget: result.sums.budget + value[0],
-        popularity: result.sums.popularity + value[1],
-        revenue: result.sums.revenue + value[2],
-        runtime: result.sums.runtime + value[3],
-        voteAverage: result.sums.voteAverage + value[4],
-        voteCount: result.sums.voteCount + value[5],
-        release: result.sums.release + value[6],
-      },
-      mins: {},
-      maxs: {},
+      sums: row.map((feature, key) => {
+        if (result.sums[key]) {
+          return result.sums[key] + feature;
+        } else {
+          return feature;
+        }
+      }),
+      mins: row.map((feature, key) => {
+        if (result.mins[key] === 'undefined') {
+          return result.mins[key];
+        }
+
+        if (result.mins[key] <= feature) {
+          return result.mins[key];
+        } else {
+          return feature;
+        }
+      }),
+      maxs: row.map((feature, key) => {
+        if (result.maxs[key] === 'undefined') {
+          return result.maxs[key];
+        }
+
+        if (result.maxs[key] >= feature) {
+          return result.maxs[key];
+        } else {
+          return feature;
+        }
+      }),
     };
-  }, initCoefficients);
+  }, initC);
 
-  const means = {
-    budgetMean: helperCoefficients.sums.budget / M,
-    popularityMean: helperCoefficients.sums.popularity / M,
-    revenueMean: helperCoefficients.sums.revenue / M,
-    runtimeMean: helperCoefficients.sums.runtime / M,
-    voteAverageMean: helperCoefficients.sums.voteAverage / M,
-    voteCountMean: helperCoefficients.sums.voteCount / M,
-    releaseMean: helperCoefficients.sums.release / M,
-  };
+  const means = helperC.sums.map(value => value / M);
+  const ranges =  helperC.mins.map((value, key) => helperC.maxs[key] - value);
 
-  const ranges = {
-  //   budgetRange: coefficients.maxs.budget - coefficients.mins.budget,
-  //   popularityRange: coefficients.maxs.popularity - coefficients.mins.popularity,
-  //   revenueRange: coefficients.maxs.revenue - coefficients.mins.revenue,
-  //   runtimeRange: coefficients.maxs.runtime - coefficients.mins.runtime,
-  //   voteAverageRange: coefficients.maxs.voteAverage - coefficients.mins.voteAverage,
-  //   voteCountRange: coefficients.maxs.voteCount - coefficients.mins.voteCount,
-  //   releaseRange: coefficients.maxs.release - coefficients.mins.release,
-  };
-
-  return { ranges, means };
+  return { ranges, means, ...helperC };
 }
 
 function toFeaturizedMovies(dictionaries) {
@@ -244,6 +221,7 @@ function toFeaturizedMovies(dictionaries) {
 
 function toFeaturizedNumber(movie, property) {
   const number = Number(movie[property]);
+
   // Fallback for NaN
   if (number > 0 || number === 0) {
     return number;
@@ -265,7 +243,7 @@ function toFeaturizedHomepage(movie) {
 }
 
 function toFeaturizedLanguage(movie) {
-  return movie.language === 'eng' ? 1 : 0;
+  return movie.language === 'en' ? 1 : 0;
 }
 
 function toFeaturizedFromDictionary(movie, dictionary, property) {
