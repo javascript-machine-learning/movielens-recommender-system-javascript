@@ -72,13 +72,17 @@ function init([ moviesMetaData, moviesKeywords, ratings ]) {
   //  Preparation //
   /* -------------*/
 
+  console.log(ratings[0]);
+
+  return;
+
   // Pre-processing movies for unified data structure
   // E.g. get overview property into same shape as studio property
   let movies = zip(moviesMetaData, moviesKeywords);
   movies = withTokenizedAndStemmed(movies, 'overview');
   movies = fromArrayToMap(movies, 'overview');
 
-  // Preparing dictionaries for Feature Extraction
+  // Preparing dictionaries for feature extraction
   let genresDictionary = toDictionary(movies, 'genres');
   let studioDictionary = toDictionary(movies, 'studio');
   let keywordsDictionary = toDictionary(movies, 'keywords');
@@ -99,19 +103,24 @@ function init([ moviesMetaData, moviesKeywords, ratings ]) {
     overviewDictionary,
   };
 
-  // Feature Extraction
+  // Feature Extraction:
+  // Map different types to numerical values (e.g. adult to 0 or 1)
+  // Map dictionaries to partial feature vectors
   let X = movies.map(toFeaturizedMovies(DICTIONARIES));
 
-  // Extract a couple of valuable cooeficients for operations later on
+  // Extract a couple of valuable coefficients
+  // Can be used in a later stage (e.g. feature scaling)
   const { means, ranges } = getCoefficients(X);
 
-  // Synthesize missing features in movies
-  X = synthesizeFeatures(X, means);
+  // Synthesize Features:
+  // Missing features (such as budget, release, revenue)
+  // can be synthesized with the mean of the features
+  X = synthesizeFeatures(X, means, [0, 1, 2, 3, 4, 5, 6]);
 
-  // Feature Scaling
+  // Feature Scaling:
+  // Normalize features based on mean and range vectors
   X = scaleFeatures(X, means, ranges);
-
-  console.log(X[0]);
+  console.log(X[1]);
 }
 
 function scaleFeatures(X, means, ranges) {
@@ -122,29 +131,15 @@ function scaleFeatures(X, means, ranges) {
   });
 };
 
-function synthesizeFeatures(X, means) {
-  return X.map(movie => {
-    let [
-      budget,
-      popularity,
-      revenue,
-      runtime,
-      voteAverage,
-      voteCount,
-      release,
-      ...otherFeatures
-    ] = movie;
-
-    return [
-      budget ? budget : means[0],
-      popularity ? popularity : means[1],
-      revenue ? revenue : means[2],
-      runtime ? runtime : means[3],
-      voteAverage ? voteAverage : means[4],
-      voteCount ? voteCount : means[5],
-      release ? release : means[6],
-      ...otherFeatures,
-    ];
+function synthesizeFeatures(X, means, featureIndexes) {
+  return X.map((row) => {
+    return row.map((feature, key) => {
+      if (featureIndexes.includes(key)) {
+        return means[key];
+      } else {
+        return feature;
+      }
+    });
   });
 }
 
@@ -215,23 +210,12 @@ function toFeaturizedMovies(dictionaries) {
     featureVector.push(toFeaturizedHomepage(movie));
     featureVector.push(toFeaturizedLanguage(movie));
 
-    featureVector.push(...toFeaturizedFromDictionary(movie, dictionaries.genresDictionary, 'genres'));
-    featureVector.push(...toFeaturizedFromDictionary(movie, dictionaries.overviewDictionary, 'overview'));
-    featureVector.push(...toFeaturizedFromDictionary(movie, dictionaries.studioDictionary, 'studio'));
-    featureVector.push(...toFeaturizedFromDictionary(movie, dictionaries.keywordsDictionary, 'keywords'));
+    // featureVector.push(...toFeaturizedFromDictionary(movie, dictionaries.genresDictionary, 'genres'));
+    // featureVector.push(...toFeaturizedFromDictionary(movie, dictionaries.overviewDictionary, 'overview'));
+    // featureVector.push(...toFeaturizedFromDictionary(movie, dictionaries.studioDictionary, 'studio'));
+    // featureVector.push(...toFeaturizedFromDictionary(movie, dictionaries.keywordsDictionary, 'keywords'));
 
     return featureVector;
-  }
-}
-
-function toFeaturizedNumber(movie, property) {
-  const number = Number(movie[property]);
-
-  // Fallback for NaN
-  if (number > 0 || number === 0) {
-    return number;
-  } else {
-    return 0;
   }
 }
 
@@ -256,6 +240,17 @@ function toFeaturizedFromDictionary(movie, dictionary, property) {
   const propertyIds = (movie[property] || []).map(value => value.id);
   const isIncluded = (value) => propertyIds.includes(value.id) ? 1 : 0;
   return dictionary.map(isIncluded);
+}
+
+function toFeaturizedNumber(movie, property) {
+  const number = Number(movie[property]);
+
+  // Fallback for NaN
+  if (number > 0 || number === 0) {
+    return number;
+  } else {
+    return 0;
+  }
 }
 
 // Refactored in favor of generic function
