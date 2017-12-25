@@ -1,4 +1,6 @@
 // https://www.kaggle.com/rounakbanik/the-movies-dataset/data
+// Exercise: Use credits data with crew and cast too
+// Exercise: Make feature more weighted based on popularity or actors
 
 import fs from 'fs';
 import csv from 'fast-csv';
@@ -75,15 +77,19 @@ function init([ moviesMetaData, moviesKeywords, ratings ]) {
   //  Preparation //
   /* -------------*/
 
+  // Binary Ratings Matrix (computational expensive)
+  // Only group ratings by user
+  let ratingsGroupedByUser = getRatingsGroupedByUser(ratings);
+
   // Pre-processing movies for unified data structure
   // E.g. get overview property into same shape as studio property
   let movies = zip(moviesMetaData, moviesKeywords);
   movies = withTokenizedAndStemmed(movies, 'overview');
   movies = fromArrayToMap(movies, 'overview');
 
-  // Binary Ratings Matrix (computational expensive)
-  // Only group ratings by user
-  let ratingsGroupedByUser = getRatingsGroupedByUser(ratings);
+  // Remove unrated movies, otherwise the data set is too big
+  // let ratingsGroupedByMovie = getRatingsGroupedByMovie(ratings);
+  // movies = withoutUnratedMovies(movies, ratingsGroupedByMovie);
 
   // Preparing dictionaries for feature extraction
   let genresDictionary = toDictionary(movies, 'genres');
@@ -95,7 +101,7 @@ function init([ moviesMetaData, moviesKeywords, ratings ]) {
   // Depending on threshold you get a different size of a feature vector for a movie
   // The following case attempts to keep feature vector small for computational efficiency
   genresDictionary = filterByThreshold(genresDictionary, 1);
-  studioDictionary = filterByThreshold(studioDictionary, 50);
+  studioDictionary = filterByThreshold(studioDictionary, 100);
   keywordsDictionary = filterByThreshold(keywordsDictionary, 100);
   overviewDictionary = filterByThreshold(overviewDictionary, 750);
 
@@ -128,7 +134,38 @@ function init([ moviesMetaData, moviesKeywords, ratings ]) {
   //  Prediction //
   /* ------------*/
 
-  const recommendation = getContentBasedRecommendationByUser(X, movies, ratingsGroupedByUser['1']);
+  // const contentBasedRecommendation = getContentBasedRecommendationByUser(X, movies, ratingsGroupedByUser['1']);
+
+  const { movie, index } = getMovieByTitle(movies, 'Batman Begins');
+  const cosineSimilarityRowVector = getCosineSimilarityRowVector(X, index);
+  const similarityBasedRecommendation = getSimilarityBasedRecommendation(cosineSimilarityRowVector, 10);
+
+  console.log(movie.title);
+  console.log(similarityBasedRecommendation.map(result => movies[result.key].title));
+}
+
+function getMovieByTitle(movies, title) {
+  const index = movies.map(movie => movie.title).indexOf(title);
+  return { movie: movies[index], index };
+}
+
+// Ascending sorted recommendation
+function getSimilarityBasedRecommendation(cosineSimilarityRowVector, count) {
+  return cosineSimilarityRowVector
+    .map((value, key) => ({ value, key }))
+    .sort((a, b) => b.value - a.value)
+    // 0th is input movie because similarity is 1
+    .slice(1, count + 1);
+}
+
+// X x 1 row vector based on similarities of movies
+// 1 means similar, -1 means not similar, 0 means orthogonal
+// Matrix is too computational expensive for 45.000 movies
+// https://en.wikipedia.org/wiki/Cosine_similarity
+function getCosineSimilarityRowVector(X, index) {
+  return X[index].map((row, i) => {
+    return similarity(X[index], X[i]);
+  });
 }
 
 function getContentBasedRecommendationByUser(X, movies, ratings) {
@@ -168,17 +205,10 @@ function getContentBasedRecommendationByUser(X, movies, ratings) {
     training.y,
     theta,
     0.03,
-    100
+    750
   );
 
-  // 100 ; 0.08
-  // 500 ; 0.001
-  // 1000 ; 0.00002
-
   let predictedRatings = getPredictedRatings(theta, test.X);
-
-  var max = predictedRatings.map(foo => foo[0]).reduce((a, b) => math.max(a, b));
-  console.log(max);
 
   // Format the vector to convey the referenced movie id
   predictedRatings = test.X.map((v, key) => ({
@@ -186,8 +216,7 @@ function getContentBasedRecommendationByUser(X, movies, ratings) {
     movie: test.references[key],
   }));
 
-  predictedRatings = predictedRatings.sort((a, b) => b.rating - a.rating);
-  console.log(predictedRatings[0]);
+  return predictedRatings.sort((a, b) => b.rating - a.rating);
 }
 
 function gradientDescent(X, y, theta, ALPHA, ITERATIONS) {
@@ -201,11 +230,10 @@ function gradientDescent(X, y, theta, ALPHA, ITERATIONS) {
       X,
       y,
     });
-
   }
 
-    const cost = computeCost(X, y, theta);
-    console.log(cost);
+  const cost = computeCost(X, y, theta);
+  console.log(cost);
 
   return theta;
 }
@@ -236,6 +264,24 @@ function computeCost(X, y, theta) {
   });
 
   return J;
+}
+
+// function withoutUnratedMovies(movies, ratingsGroupedByMovie) {
+//   return movies.filter(movie => ratingsGroupedByMovie[movie.id]);
+// }
+
+function getRatingsGroupedByMovie(ratings) {
+  return ratings.reduce((result, value) => {
+    const { userId, movieId, rating, timestamp } = value;
+
+    if (!result[movieId]) {
+      result[movieId] = {};
+    }
+
+    result[movieId][userId] = { rating: Number(rating), timestamp };
+
+    return result;
+  }, {});
 }
 
 function getRatingsGroupedByUser(ratings) {
