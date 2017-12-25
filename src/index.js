@@ -34,6 +34,7 @@ let ratingsPromise = new Promise((resolve) =>
 
 function fromMetaDataFile(row) {
   MOVIES_META_DATA[row.id] = {
+    id: row.id,
     adult: row.adult,
     budget: row.budget,
     genres: softEval(row.genres, []),
@@ -72,15 +73,16 @@ function init([ moviesMetaData, moviesKeywords, ratings ]) {
   //  Preparation //
   /* -------------*/
 
-  console.log(ratings[0]);
-
-  return;
-
   // Pre-processing movies for unified data structure
   // E.g. get overview property into same shape as studio property
   let movies = zip(moviesMetaData, moviesKeywords);
   movies = withTokenizedAndStemmed(movies, 'overview');
   movies = fromArrayToMap(movies, 'overview');
+
+  // Binary Ratings Matrix (computational expensive)
+  // Only group ratings by user
+  let ratingsGroupedByUser = getRatingsGroupedByUser(ratings);
+  console.log(ratingsGroupedByUser);
 
   // Preparing dictionaries for feature extraction
   let genresDictionary = toDictionary(movies, 'genres');
@@ -120,8 +122,34 @@ function init([ moviesMetaData, moviesKeywords, ratings ]) {
   // Feature Scaling:
   // Normalize features based on mean and range vectors
   X = scaleFeatures(X, means, ranges);
+
   console.log(X[1]);
 }
+
+function getRatingsGroupedByUser(ratings) {
+  return ratings.reduce((result, value) => {
+    const { userId, ...ratingObject } = value;
+
+    if (!result[userId]) {
+      result[userId] = [ratingObject];
+    } else {
+      result[userId].push(ratingObject);
+    }
+
+    return result;
+  }, {});
+}
+
+// Too much computation happening here
+
+// function getBinaryRatingsMatrix(movies, ratingsGroupedByUser) {
+//   return movies.map((movie) => {
+//     return Object.keys(ratingsGroupedByUser).map((ratingKey) => {
+//       const movieIds = ratingsGroupedByUser[ratingKey].map(rating => rating.movieId);
+//       return movieIds.includes(movie.id) ? 1 : 0;
+//     });
+//   });
+// }
 
 function scaleFeatures(X, means, ranges) {
   return X.map((row) => {
@@ -191,7 +219,7 @@ function getCoefficients(X) {
   const means = helperC.sums.map(value => value / M);
   const ranges =  helperC.mins.map((value, key) => helperC.maxs[key] - value);
 
-  return { ranges, means, ...helperC };
+  return { ranges, means };
 }
 
 function toFeaturizedMovies(dictionaries) {
