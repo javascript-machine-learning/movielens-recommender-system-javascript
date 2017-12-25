@@ -3,6 +3,8 @@
 import fs from 'fs';
 import csv from 'fast-csv';
 import natural from 'natural';
+import math from 'mathjs';
+import similarity from 'compute-cosine-similarity';
 import synchronizedShuffle from 'synchronized-array-shuffle';
 
 natural.PorterStemmer.attach();
@@ -82,7 +84,6 @@ function init([ moviesMetaData, moviesKeywords, ratings ]) {
   // Binary Ratings Matrix (computational expensive)
   // Only group ratings by user
   let ratingsGroupedByUser = getRatingsGroupedByUser(ratings);
-  console.log(ratingsGroupedByUser);
 
   // Preparing dictionaries for feature extraction
   let genresDictionary = toDictionary(movies, 'genres');
@@ -123,24 +124,135 @@ function init([ moviesMetaData, moviesKeywords, ratings ]) {
   // Normalize features based on mean and range vectors
   X = scaleFeatures(X, means, ranges);
 
-  console.log(X[1]);
+  /* ----------- */
+  //  Prediction //
+  /* ------------*/
+
+  const recommendation = getContentBasedRecommendationByUser(X, movies, ratingsGroupedByUser['1']);
+}
+
+function getContentBasedRecommendationByUser(X, movies, ratings) {
+  // Add intercept term
+  const ones = Array(X.length).fill().map((v, i) => [1]);
+  X = math.concat(ones, X);
+
+  const init = {
+    training: {
+      X: [],
+      y: [],
+    },
+    // Even though it is not really a test set
+    // because it has no labels
+    test: {
+      X: [],
+      references: [],
+    }
+  };
+
+  const { training, test } = movies.reduce((result, value, key) => {
+    if (ratings[value.id]) {
+      result.training.X.push(X[key]);
+      result.training.y.push([ratings[value.id].rating]); // ??
+    } else {
+      result.test.X.push(X[key]);
+      // Keep a reference to map the training matrix to the real movies later
+      result.test.references.push(value);
+    }
+
+    return result;
+  }, init);
+
+  let theta = Array(training.X[0].length).fill().map((v, i) => [0]);
+  theta = gradientDescent(
+    training.X,
+    training.y,
+    theta,
+    0.03,
+    100
+  );
+
+  // 100 ; 0.08
+  // 500 ; 0.001
+  // 1000 ; 0.00002
+
+  let predictedRatings = getPredictedRatings(theta, test.X);
+
+  var max = predictedRatings.map(foo => foo[0]).reduce((a, b) => math.max(a, b));
+  console.log(max);
+
+  // Format the vector to convey the referenced movie id
+  predictedRatings = test.X.map((v, key) => ({
+    rating: predictedRatings[key],
+    movie: test.references[key],
+  }));
+
+  predictedRatings = predictedRatings.sort((a, b) => b.rating - a.rating);
+  console.log(predictedRatings[0]);
+}
+
+function gradientDescent(X, y, theta, ALPHA, ITERATIONS) {
+  const m = y.length;
+
+  for (let i = 0; i < ITERATIONS; i++) {
+    theta = math.eval(`theta - ALPHA / m * ((X * theta - y)' * X)'`, {
+      theta,
+      ALPHA,
+      m,
+      X,
+      y,
+    });
+
+  }
+
+    const cost = computeCost(X, y, theta);
+    console.log(cost);
+
+  return theta;
+}
+
+function getPredictedRatings(theta, X) {
+  return math.eval(`X * theta`, {
+    theta,
+    X,
+  })
+}
+
+function computeCost(X, y, theta) {
+  let m = y.length;
+
+  let predictions = math.eval('X * theta', {
+    X,
+    theta,
+  });
+
+  let sqrErrors = math.eval('(predictions - y).^2', {
+    predictions,
+    y,
+  });
+
+  let J = math.eval(`1 / (2 * m) * sum(sqrErrors)`, {
+    m,
+    sqrErrors,
+  });
+
+  return J;
 }
 
 function getRatingsGroupedByUser(ratings) {
   return ratings.reduce((result, value) => {
-    const { userId, ...ratingObject } = value;
+    const { userId, movieId, rating, timestamp } = value;
 
     if (!result[userId]) {
-      result[userId] = [ratingObject];
-    } else {
-      result[userId].push(ratingObject);
+      result[userId] = {};
     }
+
+    result[userId][movieId] = { rating: Number(rating), timestamp };
 
     return result;
   }, {});
 }
 
-// Too much computation happening here
+// Too expensive
 
 // function getBinaryRatingsMatrix(movies, ratingsGroupedByUser) {
 //   return movies.map((movie) => {
@@ -162,7 +274,7 @@ function scaleFeatures(X, means, ranges) {
 function synthesizeFeatures(X, means, featureIndexes) {
   return X.map((row) => {
     return row.map((feature, key) => {
-      if (featureIndexes.includes(key)) {
+      if (featureIndexes.includes(key) && feature === 'undefined') {
         return means[key];
       } else {
         return feature;
@@ -172,8 +284,6 @@ function synthesizeFeatures(X, means, featureIndexes) {
 }
 
 function getCoefficients(X) {
-  // TODO: Without removing the unsynthesized rows
-  // stretches down all min features to 0?!
   const M = X.length;
 
   const initC = {
@@ -183,6 +293,10 @@ function getCoefficients(X) {
   };
 
   const helperC = X.reduce((result, row) => {
+    if (row.includes('undefined')) {
+      return result;
+    }
+
     return {
       sums: row.map((feature, key) => {
         if (result.sums[key]) {
@@ -238,17 +352,17 @@ function toFeaturizedMovies(dictionaries) {
     featureVector.push(toFeaturizedHomepage(movie));
     featureVector.push(toFeaturizedLanguage(movie));
 
-    // featureVector.push(...toFeaturizedFromDictionary(movie, dictionaries.genresDictionary, 'genres'));
-    // featureVector.push(...toFeaturizedFromDictionary(movie, dictionaries.overviewDictionary, 'overview'));
-    // featureVector.push(...toFeaturizedFromDictionary(movie, dictionaries.studioDictionary, 'studio'));
-    // featureVector.push(...toFeaturizedFromDictionary(movie, dictionaries.keywordsDictionary, 'keywords'));
+    featureVector.push(...toFeaturizedFromDictionary(movie, dictionaries.genresDictionary, 'genres'));
+    featureVector.push(...toFeaturizedFromDictionary(movie, dictionaries.overviewDictionary, 'overview'));
+    featureVector.push(...toFeaturizedFromDictionary(movie, dictionaries.studioDictionary, 'studio'));
+    featureVector.push(...toFeaturizedFromDictionary(movie, dictionaries.keywordsDictionary, 'keywords'));
 
     return featureVector;
   }
 }
 
 function toFeaturizedRelease(movie) {
-  return Number(movie.release ? (movie.release).slice(0, 4) : '');
+  return movie.release ? Number((movie.release).slice(0, 4)) : 'undefined';
 }
 
 function toFeaturizedAdult(movie) {
@@ -277,7 +391,7 @@ function toFeaturizedNumber(movie, property) {
   if (number > 0 || number === 0) {
     return number;
   } else {
-    return 0;
+    return 'undefined';
   }
 }
 
