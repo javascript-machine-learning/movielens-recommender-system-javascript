@@ -7,7 +7,7 @@ import csv from 'fast-csv';
 import natural from 'natural';
 import math from 'mathjs';
 import similarity from 'compute-cosine-similarity';
-import synchronizedShuffle from 'synchronized-array-shuffle';
+import { knuthShuffle } from 'knuth-shuffle';
 
 natural.PorterStemmer.attach();
 
@@ -77,13 +77,10 @@ function init([ moviesMetaData, moviesKeywords, ratings ]) {
   //  Preparation //
   /* -------------*/
 
-  // Binary Ratings Matrix (computational expensive)
-  // Only group ratings by user
-  let ratingsGroupedByUser = getRatingsGroupedByUser(ratings);
-
   // Pre-processing movies for unified data structure
   // E.g. get overview property into same shape as studio property
   let movies = zip(moviesMetaData, moviesKeywords);
+  movies = knuthShuffle(movies);
   movies = withTokenizedAndStemmed(movies, 'overview');
   movies = fromArrayToMap(movies, 'overview');
 
@@ -101,8 +98,8 @@ function init([ moviesMetaData, moviesKeywords, ratings ]) {
   // Depending on threshold you get a different size of a feature vector for a movie
   // The following case attempts to keep feature vector small for computational efficiency
   genresDictionary = filterByThreshold(genresDictionary, 1);
-  studioDictionary = filterByThreshold(studioDictionary, 100);
-  keywordsDictionary = filterByThreshold(keywordsDictionary, 100);
+  studioDictionary = filterByThreshold(studioDictionary, 75);
+  keywordsDictionary = filterByThreshold(keywordsDictionary, 150);
   overviewDictionary = filterByThreshold(overviewDictionary, 750);
 
   const DICTIONARIES = {
@@ -130,32 +127,42 @@ function init([ moviesMetaData, moviesKeywords, ratings ]) {
   // Normalize features based on mean and range vectors
   X = scaleFeatures(X, means, ranges);
 
-  /* ----------- */
-  //  Prediction //
-  /* ------------*/
+  /* ------------------------- */
+  //  Content-Based Prediction //
+  /* ------------------------- */
 
+  // Content-Based Recommendation
+  // Linear Regression and Gradient Descent
+  // let ratingsGroupedByUser = getRatingsGroupedByUser(ratings);
   // const contentBasedRecommendation = getContentBasedRecommendationByUser(X, movies, ratingsGroupedByUser['1']);
 
-  const { movie, index } = getMovieByTitle(movies, 'Batman Begins');
-  const cosineSimilarityRowVector = getCosineSimilarityRowVector(X, index);
-  const similarityBasedRecommendation = getSimilarityBasedRecommendation(cosineSimilarityRowVector, 10);
+  // Content-Based Recommendation
+  // Cosine Similarity Matrix
+  const { title, index, movie } = getMovieByTitle(movies, 'Batman Begins');
+  const similarityBasedRecommendation = getSimilarityBasedRecommendation(X, index, 10);
+  console.log(
+    `Similarity recommendation based for ${title}:`,
+    similarityBasedRecommendation.map(v => movies[v.key].title)
+  );
 
-  console.log(movie.title);
-  console.log(similarityBasedRecommendation.map(result => movies[result.key].title));
+  /* ----------------------------------- */
+  //  Collaborative-Filtering Prediction //
+  /* ----------------------------------- */
+}
+
+// Ascending sorted recommendation
+function getSimilarityBasedRecommendation(X, index, count) {
+  const cosineSimilarityRowVector = getCosineSimilarityRowVector(X, index);
+
+  return cosineSimilarityRowVector
+    .map((value, key) => ({ value, key }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, count);
 }
 
 function getMovieByTitle(movies, title) {
   const index = movies.map(movie => movie.title).indexOf(title);
-  return { movie: movies[index], index };
-}
-
-// Ascending sorted recommendation
-function getSimilarityBasedRecommendation(cosineSimilarityRowVector, count) {
-  return cosineSimilarityRowVector
-    .map((value, key) => ({ value, key }))
-    .sort((a, b) => b.value - a.value)
-    // 0th is input movie because similarity is 1
-    .slice(1, count + 1);
+  return { title, index, movie: movies[index] };
 }
 
 // X x 1 row vector based on similarities of movies
@@ -163,7 +170,7 @@ function getSimilarityBasedRecommendation(cosineSimilarityRowVector, count) {
 // Matrix is too computational expensive for 45.000 movies
 // https://en.wikipedia.org/wiki/Cosine_similarity
 function getCosineSimilarityRowVector(X, index) {
-  return X[index].map((row, i) => {
+  return X.map((row, i) => {
     return similarity(X[index], X[i]);
   });
 }
@@ -189,7 +196,7 @@ function getContentBasedRecommendationByUser(X, movies, ratings) {
   const { training, test } = movies.reduce((result, value, key) => {
     if (ratings[value.id]) {
       result.training.X.push(X[key]);
-      result.training.y.push([ratings[value.id].rating]); // ??
+      result.training.y.push([ratings[value.id].rating]);
     } else {
       result.test.X.push(X[key]);
       // Keep a reference to map the training matrix to the real movies later
@@ -233,7 +240,7 @@ function gradientDescent(X, y, theta, ALPHA, ITERATIONS) {
   }
 
   const cost = computeCost(X, y, theta);
-  console.log(cost);
+  // console.log(cost);
 
   return theta;
 }

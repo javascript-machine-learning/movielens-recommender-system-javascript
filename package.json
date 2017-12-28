@@ -20,11 +20,8 @@
     "compute-cosine-similarity": "^1.0.0",
     "deeplearn": "^0.3.13",
     "fast-csv": "^2.4.1",
+    "knuth-shuffle": "^1.0.8",
     "mathjs": "^3.18.0",
-    "natural": "^0.5.4",
-    "sanitize-html": "^1.16.3",
-    "svm": "^0.1.1",
-    "synchronized-array-shuffle": "^0.1.0",
-    "url-regex": "^4.1.1"
+    "natural": "^0.5.4"
   }
 }
