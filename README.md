@@ -1,4 +1,6 @@
-# Recommendation System in JavaScript
+# Recommendation System in JavaScript with MovieLens Database
+
+[![Build Status](https://travis-ci.org/javascript-machine-learning/recommendation-system-javascript.svg?branch=master)](https://travis-ci.org/javascript-machine-learning/recommendation-system-javascript)
 
 ...
 
