@@ -188,12 +188,14 @@ function init([ moviesMetaData, moviesKeywords, ratings ]) {
 }
 
 export function sliceAndDice(recommendations, MOVIES_BY_ID, count, onlyTitle) {
-  const movieRecommendations = recommendations
-    .slice(0, count);
+  recommendations = recommendations.filter(recommendation => MOVIES_BY_ID[recommendation.movieId]);
 
-  return onlyTitle
-    ? movieRecommendations.map(mr => ({ title: MOVIES_BY_ID[mr.movieId].title, prediction: mr.prediction }))
-    : movieRecommendations.map(mr => ({ title: MOVIES_BY_ID[mr.movieId], prediction: mr.prediction }))
+  recommendations = onlyTitle
+    ? recommendations.map(mr => ({ title: MOVIES_BY_ID[mr.movieId].title, prediction: mr.prediction }))
+    : recommendations.map(mr => ({ movie: MOVIES_BY_ID[mr.movieId], prediction: mr.prediction }));
+
+  return recommendations
+    .slice(0, count);
 }
 
 export function softEval(string, escape) {
