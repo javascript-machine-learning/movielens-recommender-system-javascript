@@ -9,7 +9,7 @@ import prepareRatings from './preparation/ratings';
 import prepareMovies from './preparation/movies';
 import predictWithLinearRegression from './strategies/linearRegression';
 import predictWithContentBased from './strategies/contentBased';
-import predictWithCollaborativeFiltering from './strategies/collaborativeFiltering';
+import predictWithCfUserBased from './strategies/collaborativeFiltering/userBased';
 
 const ARTIFICIAL_USER_RATINGS = [
   {
@@ -46,6 +46,16 @@ const ARTIFICIAL_USER_RATINGS = [
     userId: '0',
     movieId: '1726', // Iron Man
     rating: '5.0',
+  },
+  {
+    userId: '0',
+    movieId: '457', // Sissi
+    rating: '1.0',
+  },
+  {
+    userId: '0',
+    movieId: '597', // Titanic
+    rating: '1.0',
   },
 ];
 
@@ -168,20 +178,21 @@ function init([ moviesMetaData, moviesKeywords, ratings ]) {
 
   /* ----------------------------------- */
   //  Collaborative-Filtering Prediction //
-  //           User Item Based           //
+  //             User-Based              //
   /* ----------------------------------- */
 
-  console.log('Collaborative-Filtering Prediction (User-Item) ... \n');
+  console.log('Collaborative-Filtering Prediction ... \n');
 
-  console.log('(1) Computing User-Item Matrix and Cosine Similarity \n');
-  const collaborativeFilteringBasedRecommendation = predictWithCollaborativeFiltering(
+  console.log('(1) Computing User-Based Cosine Similarity \n');
+  const cfUserBasedRecommendation = predictWithCfUserBased(
     ratingsGroupedByUser,
     ratingsGroupedByMovie,
+    MOVIES_IN_LIST,
     ME_USER_INDEX
   );
 
   console.log('(2) Prediction \n');
-  console.log(sliceAndDice(collaborativeFilteringBasedRecommendation, MOVIES_BY_ID, 10, true));
+  console.log(sliceAndDice(cfUserBasedRecommendation, MOVIES_BY_ID, 10, true));
 
   console.log('\n');
   console.log('End ...');
