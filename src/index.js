@@ -4,34 +4,74 @@
 
 import fs from 'fs';
 import csv from 'fast-csv';
-import natural from 'natural';
-import math from 'mathjs';
-import similarity from 'compute-cosine-similarity';
-import { knuthShuffle } from 'knuth-shuffle';
 
-natural.PorterStemmer.attach();
+import prepareRatings from './preparation/ratings';
+import prepareMovies from './preparation/movies';
+import predictWithLinearRegression from './strategies/linearRegression';
+import predictWithContentBased from './strategies/contentBased';
+import predictWithCollaborativeFiltering from './strategies/collaborativeFiltering';
+
+const ARTIFICIAL_USER_RATINGS = [
+  {
+    userId: '0',
+    movieId: '155', // The Dark Knight
+    rating: '5.0',
+  },
+  {
+    userId: '0',
+    movieId: '49026', // The Dark Knight Rises
+    rating: '4.0',
+  },
+  {
+    userId: '0',
+    movieId: '40662', // Batman: Under the Red Hood
+    rating: '3.0',
+  },
+  {
+    userId: '0',
+    movieId: '58574', // Sherlock Holmes: A Game of Shadows
+    rating: '4.0',
+  },
+  {
+    userId: '0',
+    movieId: '44038', // Lovecraft: Fear of the Unknown
+    rating: '3.0',
+  },
+  {
+    userId: '0',
+    movieId: '415', // Batman & Robin
+    rating: '4.0',
+  },
+  {
+    userId: '0',
+    movieId: '1726', // Iron Man
+    rating: '5.0',
+  },
+];
 
 let MOVIES_META_DATA = {};
 let MOVIES_KEYWORDS = {};
-let RATINGS = [];
+let RATINGS = [...ARTIFICIAL_USER_RATINGS];
+
+let ME_USER_INDEX = 0;
 
 let moviesMetaDataPromise = new Promise((resolve) =>
   fs
-    .createReadStream('./src/movies_metadata.csv')
+    .createReadStream('./src/data/movies_metadata.csv')
     .pipe(csv({ headers: true }))
     .on('data', fromMetaDataFile)
     .on('end', () => resolve(MOVIES_META_DATA)));
 
 let moviesKeywordsPromise = new Promise((resolve) =>
   fs
-    .createReadStream('./src/keywords.csv')
+    .createReadStream('./src/data/keywords.csv')
     .pipe(csv({ headers: true }))
     .on('data', fromKeywordsFile)
     .on('end', () => resolve(MOVIES_KEYWORDS)));
 
 let ratingsPromise = new Promise((resolve) =>
   fs
-    .createReadStream('./src/ratings_small.csv')
+    .createReadStream('./src/data/ratings_small.csv')
     .pipe(csv({ headers: true }))
     .on('data', fromRatingsFile)
     .on('end', () => resolve(RATINGS)));
@@ -42,13 +82,13 @@ function fromMetaDataFile(row) {
     adult: row.adult,
     budget: row.budget,
     genres: softEval(row.genres, []),
-    homepage: row.homepage, // perhaps it says something if there is a homepage (0:'', 1:'http://...')
-    language: row.original_language, // people might be more inot foreign movies (0:eng, 1:other)
-    title: row.original_title, // no feature, but later in movie lookup table
-    overview: row.overview, // preprocess: tokenize, stemmer (dictionary)
+    homepage: row.homepage,
+    language: row.original_language,
+    title: row.original_title,
+    overview: row.overview,
     popularity: row.popularity,
-    studio: softEval(row.production_companies, []), // people might have their favorite film studios (dictionary)
-    release: row.release_date, // (0: 1964, 1:2018)
+    studio: softEval(row.production_companies, []),
+    release: row.release_date,
     revenue: row.revenue,
     runtime: row.runtime,
     voteAverage: row.vote_average,
@@ -58,13 +98,15 @@ function fromMetaDataFile(row) {
 
 function fromKeywordsFile(row) {
   MOVIES_KEYWORDS[row.id] = {
-    keywords: softEval(row.keywords, []), // (dictionary)
+    keywords: softEval(row.keywords, []),
   };
 }
 
 function fromRatingsFile(row) {
   RATINGS.push(row);
 }
+
+console.log('Unloading data from files ... \n');
 
 Promise.all([
   moviesMetaDataPromise,
@@ -77,476 +119,84 @@ function init([ moviesMetaData, moviesKeywords, ratings ]) {
   //  Preparation //
   /* -------------*/
 
-  // Pre-processing movies for unified data structure
-  // E.g. get overview property into same shape as studio property
-  let movies = zip(moviesMetaData, moviesKeywords);
-  movies = knuthShuffle(movies);
-  movies = withTokenizedAndStemmed(movies, 'overview');
-  movies = fromArrayToMap(movies, 'overview');
+  const {
+    MOVIES_BY_ID,
+    MOVIES_IN_LIST,
+    X,
+  } = prepareMovies(moviesMetaData, moviesKeywords);
 
-  // Remove unrated movies, otherwise the data set is too big
-  // let ratingsGroupedByMovie = getRatingsGroupedByMovie(ratings);
-  // movies = withoutUnratedMovies(movies, ratingsGroupedByMovie);
+  const {
+    ratingsGroupedByUser,
+    ratingsGroupedByMovie,
+  } = prepareRatings(ratings);
 
-  // Preparing dictionaries for feature extraction
-  let genresDictionary = toDictionary(movies, 'genres');
-  let studioDictionary = toDictionary(movies, 'studio');
-  let keywordsDictionary = toDictionary(movies, 'keywords');
-  let overviewDictionary = toDictionary(movies, 'overview');
+  /* ----------------------------- */
+  //  Linear Regression Prediction //
+  //        Gradient Descent       //
+  /* ----------------------------- */
 
-  // Customize the threshold to your own needs
-  // Depending on threshold you get a different size of a feature vector for a movie
-  // The following case attempts to keep feature vector small for computational efficiency
-  genresDictionary = filterByThreshold(genresDictionary, 1);
-  studioDictionary = filterByThreshold(studioDictionary, 75);
-  keywordsDictionary = filterByThreshold(keywordsDictionary, 150);
-  overviewDictionary = filterByThreshold(overviewDictionary, 750);
+  /*** UNCOMMENT TO USE RECOMMENDER STRATEGY
 
-  const DICTIONARIES = {
-    genresDictionary,
-    studioDictionary,
-    keywordsDictionary,
-    overviewDictionary,
-  };
+  console.log('Linear Regression Prediction ... \n');
 
-  // Feature Extraction:
-  // Map different types to numerical values (e.g. adult to 0 or 1)
-  // Map dictionaries to partial feature vectors
-  let X = movies.map(toFeaturizedMovies(DICTIONARIES));
+  console.log('(1) Training \n');
+  const meUserRatings = ratingsGroupedByUser[ME_USER_INDEX];
+  const linearRegressionBasedRecommendation = predictWithLinearRegression(X, MOVIES_IN_LIST, meUserRatings);
 
-  // Extract a couple of valuable coefficients
-  // Can be used in a later stage (e.g. feature scaling)
-  const { means, ranges } = getCoefficients(X);
+  console.log('(2) Prediction \n');
+  console.log(sliceAndDice(linearRegressionBasedRecommendation, MOVIES_BY_ID, 10, true));
 
-  // Synthesize Features:
-  // Missing features (such as budget, release, revenue)
-  // can be synthesized with the mean of the features
-  X = synthesizeFeatures(X, means, [0, 1, 2, 3, 4, 5, 6]);
-
-  // Feature Scaling:
-  // Normalize features based on mean and range vectors
-  X = scaleFeatures(X, means, ranges);
+  ***/
 
   /* ------------------------- */
   //  Content-Based Prediction //
+  //  Cosine Similarity Matrix //
   /* ------------------------- */
 
-  // Content-Based Recommendation
-  // Linear Regression and Gradient Descent
-  // let ratingsGroupedByUser = getRatingsGroupedByUser(ratings);
-  // const contentBasedRecommendation = getContentBasedRecommendationByUser(X, movies, ratingsGroupedByUser['1']);
+  /*** UNCOMMENT TO USE RECOMMENDER STRATEGY
 
-  // Content-Based Recommendation
-  // Cosine Similarity Matrix
-  const { title, index, movie } = getMovieByTitle(movies, 'Batman Begins');
-  const similarityBasedRecommendation = getSimilarityBasedRecommendation(X, index, 10);
-  console.log(
-    `Similarity recommendation based for ${title}:`,
-    similarityBasedRecommendation.map(v => movies[v.key].title)
-  );
+  console.log('Content-Based Prediction ... \n');
+
+  console.log('(1) Computing Cosine Similarity \n');
+  const title = 'Batman Begins';
+  const contentBasedRecommendation = predictWithContentBased(X, MOVIES_IN_LIST, title);
+
+  console.log(`(2) Prediction based on "${title}" \n`);
+  console.log(sliceAndDice(contentBasedRecommendation, MOVIES_BY_ID, 10, true));
+
+  ***/
 
   /* ----------------------------------- */
   //  Collaborative-Filtering Prediction //
+  //           User Item Based           //
   /* ----------------------------------- */
-}
 
-// Ascending sorted recommendation
-function getSimilarityBasedRecommendation(X, index, count) {
-  const cosineSimilarityRowVector = getCosineSimilarityRowVector(X, index);
+  console.log('Collaborative-Filtering Prediction (User-Item) ... \n');
 
-  return cosineSimilarityRowVector
-    .map((value, key) => ({ value, key }))
-    .sort((a, b) => b.value - a.value)
-    .slice(0, count);
-}
-
-function getMovieByTitle(movies, title) {
-  const index = movies.map(movie => movie.title).indexOf(title);
-  return { title, index, movie: movies[index] };
-}
-
-// X x 1 row vector based on similarities of movies
-// 1 means similar, -1 means not similar, 0 means orthogonal
-// Matrix is too computational expensive for 45.000 movies
-// https://en.wikipedia.org/wiki/Cosine_similarity
-function getCosineSimilarityRowVector(X, index) {
-  return X.map((row, i) => {
-    return similarity(X[index], X[i]);
-  });
-}
-
-function getContentBasedRecommendationByUser(X, movies, ratings) {
-  // Add intercept term
-  const ones = Array(X.length).fill().map((v, i) => [1]);
-  X = math.concat(ones, X);
-
-  const init = {
-    training: {
-      X: [],
-      y: [],
-    },
-    // Even though it is not really a test set
-    // because it has no labels
-    test: {
-      X: [],
-      references: [],
-    }
-  };
-
-  const { training, test } = movies.reduce((result, value, key) => {
-    if (ratings[value.id]) {
-      result.training.X.push(X[key]);
-      result.training.y.push([ratings[value.id].rating]);
-    } else {
-      result.test.X.push(X[key]);
-      // Keep a reference to map the training matrix to the real movies later
-      result.test.references.push(value);
-    }
-
-    return result;
-  }, init);
-
-  let theta = Array(training.X[0].length).fill().map((v, i) => [0]);
-  theta = gradientDescent(
-    training.X,
-    training.y,
-    theta,
-    0.03,
-    750
+  console.log('(1) Computing User-Item Matrix and Cosine Similarity \n');
+  const collaborativeFilteringBasedRecommendation = predictWithCollaborativeFiltering(
+    ratingsGroupedByUser,
+    ratingsGroupedByMovie,
+    ME_USER_INDEX
   );
 
-  let predictedRatings = getPredictedRatings(theta, test.X);
+  console.log('(2) Prediction \n');
+  console.log(sliceAndDice(collaborativeFilteringBasedRecommendation, MOVIES_BY_ID, 10, true));
 
-  // Format the vector to convey the referenced movie id
-  predictedRatings = test.X.map((v, key) => ({
-    rating: predictedRatings[key],
-    movie: test.references[key],
-  }));
-
-  return predictedRatings.sort((a, b) => b.rating - a.rating);
+  console.log('\n');
+  console.log('End ...');
 }
 
-function gradientDescent(X, y, theta, ALPHA, ITERATIONS) {
-  const m = y.length;
+export function sliceAndDice(recommendations, MOVIES_BY_ID, count, onlyTitle) {
+  const movieRecommendations = recommendations
+    .slice(0, count);
 
-  for (let i = 0; i < ITERATIONS; i++) {
-    theta = math.eval(`theta - ALPHA / m * ((X * theta - y)' * X)'`, {
-      theta,
-      ALPHA,
-      m,
-      X,
-      y,
-    });
-  }
-
-  const cost = computeCost(X, y, theta);
-  // console.log(cost);
-
-  return theta;
+  return onlyTitle
+    ? movieRecommendations.map(mr => ({ title: MOVIES_BY_ID[mr.movieId].title, prediction: mr.prediction }))
+    : movieRecommendations.map(mr => ({ title: MOVIES_BY_ID[mr.movieId], prediction: mr.prediction }))
 }
 
-function getPredictedRatings(theta, X) {
-  return math.eval(`X * theta`, {
-    theta,
-    X,
-  })
-}
-
-function computeCost(X, y, theta) {
-  let m = y.length;
-
-  let predictions = math.eval('X * theta', {
-    X,
-    theta,
-  });
-
-  let sqrErrors = math.eval('(predictions - y).^2', {
-    predictions,
-    y,
-  });
-
-  let J = math.eval(`1 / (2 * m) * sum(sqrErrors)`, {
-    m,
-    sqrErrors,
-  });
-
-  return J;
-}
-
-// function withoutUnratedMovies(movies, ratingsGroupedByMovie) {
-//   return movies.filter(movie => ratingsGroupedByMovie[movie.id]);
-// }
-
-function getRatingsGroupedByMovie(ratings) {
-  return ratings.reduce((result, value) => {
-    const { userId, movieId, rating, timestamp } = value;
-
-    if (!result[movieId]) {
-      result[movieId] = {};
-    }
-
-    result[movieId][userId] = { rating: Number(rating), timestamp };
-
-    return result;
-  }, {});
-}
-
-function getRatingsGroupedByUser(ratings) {
-  return ratings.reduce((result, value) => {
-    const { userId, movieId, rating, timestamp } = value;
-
-    if (!result[userId]) {
-      result[userId] = {};
-    }
-
-    result[userId][movieId] = { rating: Number(rating), timestamp };
-
-    return result;
-  }, {});
-}
-
-// Too expensive
-
-// function getBinaryRatingsMatrix(movies, ratingsGroupedByUser) {
-//   return movies.map((movie) => {
-//     return Object.keys(ratingsGroupedByUser).map((ratingKey) => {
-//       const movieIds = ratingsGroupedByUser[ratingKey].map(rating => rating.movieId);
-//       return movieIds.includes(movie.id) ? 1 : 0;
-//     });
-//   });
-// }
-
-function scaleFeatures(X, means, ranges) {
-  return X.map((row) => {
-    return row.map((feature, key) => {
-      return (feature - means[key]) / ranges[key];
-    });
-  });
-};
-
-function synthesizeFeatures(X, means, featureIndexes) {
-  return X.map((row) => {
-    return row.map((feature, key) => {
-      if (featureIndexes.includes(key) && feature === 'undefined') {
-        return means[key];
-      } else {
-        return feature;
-      }
-    });
-  });
-}
-
-function getCoefficients(X) {
-  const M = X.length;
-
-  const initC = {
-    sums: [],
-    mins: [],
-    maxs: [],
-  };
-
-  const helperC = X.reduce((result, row) => {
-    if (row.includes('undefined')) {
-      return result;
-    }
-
-    return {
-      sums: row.map((feature, key) => {
-        if (result.sums[key]) {
-          return result.sums[key] + feature;
-        } else {
-          return feature;
-        }
-      }),
-      mins: row.map((feature, key) => {
-        if (result.mins[key] === 'undefined') {
-          return result.mins[key];
-        }
-
-        if (result.mins[key] <= feature) {
-          return result.mins[key];
-        } else {
-          return feature;
-        }
-      }),
-      maxs: row.map((feature, key) => {
-        if (result.maxs[key] === 'undefined') {
-          return result.maxs[key];
-        }
-
-        if (result.maxs[key] >= feature) {
-          return result.maxs[key];
-        } else {
-          return feature;
-        }
-      }),
-    };
-  }, initC);
-
-  const means = helperC.sums.map(value => value / M);
-  const ranges =  helperC.mins.map((value, key) => helperC.maxs[key] - value);
-
-  return { ranges, means };
-}
-
-function toFeaturizedMovies(dictionaries) {
-  return function toFeatureVector(movie) {
-    const featureVector = [];
-
-    featureVector.push(toFeaturizedNumber(movie, 'budget'));
-    featureVector.push(toFeaturizedNumber(movie, 'popularity'));
-    featureVector.push(toFeaturizedNumber(movie, 'revenue'));
-    featureVector.push(toFeaturizedNumber(movie, 'runtime'));
-    featureVector.push(toFeaturizedNumber(movie, 'voteAverage'));
-    featureVector.push(toFeaturizedNumber(movie, 'voteCount'));
-    featureVector.push(toFeaturizedRelease(movie));
-
-    featureVector.push(toFeaturizedAdult(movie));
-    featureVector.push(toFeaturizedHomepage(movie));
-    featureVector.push(toFeaturizedLanguage(movie));
-
-    featureVector.push(...toFeaturizedFromDictionary(movie, dictionaries.genresDictionary, 'genres'));
-    featureVector.push(...toFeaturizedFromDictionary(movie, dictionaries.overviewDictionary, 'overview'));
-    featureVector.push(...toFeaturizedFromDictionary(movie, dictionaries.studioDictionary, 'studio'));
-    featureVector.push(...toFeaturizedFromDictionary(movie, dictionaries.keywordsDictionary, 'keywords'));
-
-    return featureVector;
-  }
-}
-
-function toFeaturizedRelease(movie) {
-  return movie.release ? Number((movie.release).slice(0, 4)) : 'undefined';
-}
-
-function toFeaturizedAdult(movie) {
-  return movie.adult === 'False' ? 0 : 1;
-}
-
-function toFeaturizedHomepage(movie) {
-  return movie.homepage ? 0 : 1;
-}
-
-function toFeaturizedLanguage(movie) {
-  return movie.language === 'en' ? 1 : 0;
-}
-
-function toFeaturizedFromDictionary(movie, dictionary, property) {
-  // Fallback, because not all movies have associated keywords
-  const propertyIds = (movie[property] || []).map(value => value.id);
-  const isIncluded = (value) => propertyIds.includes(value.id) ? 1 : 0;
-  return dictionary.map(isIncluded);
-}
-
-function toFeaturizedNumber(movie, property) {
-  const number = Number(movie[property]);
-
-  // Fallback for NaN
-  if (number > 0 || number === 0) {
-    return number;
-  } else {
-    return 'undefined';
-  }
-}
-
-// Refactored in favor of generic function
-
-// function toFeaturizedGenres(movie, genresDictionary) {
-//   const movieGenreIds = movie.genres.map(genre => genre.id);
-//   const isGenre = (genre) => movieGenreIds.includes(genre.id) ? 1 : 0;
-//   return genresDictionary.map(isGenre);
-// }
-
-// function getFeatureScalingCoefficients(movies, 'budget') {
-//   const { range, mean } = movies.reduce((result, value, property) => {
-
-//   }, {});
-
-//   return { range, mean };
-// }
-
-// function toFeaturizedLanguageProperty(movie) {
-//   return 0;
-// }
-
-function fromArrayToMap(array, property) {
-  return array.map((value) => {
-    const transformed = value[property].map((value) => ({
-      id: value,
-      name: value,
-    }));
-
-    return { ...value, [property]: transformed };
-  });
-}
-
-function withTokenizedAndStemmed(array, property) {
-  return array.map((value) => ({
-    ...value,
-    [property]: value[property].tokenizeAndStem(),
-  }));
-}
-
-function filterByThreshold(dictionary, threshold) {
-  return Object.keys(dictionary)
-    .filter(key => dictionary[key].count > threshold)
-    .map(key => dictionary[key]);
-}
-
-function toDictionary(array, property) {
-  const dictionary = {};
-
-  array.forEach((value) => {
-    // fallback for null value after refactoring
-    (value[property] || []).forEach((innerValue) => {
-      if (!dictionary[innerValue.id]) {
-        dictionary[innerValue.id] = {
-          ...innerValue,
-          count: 1,
-        };
-      } else {
-        dictionary[innerValue.id] = {
-          ...dictionary[innerValue.id],
-          count: dictionary[innerValue.id].count + 1,
-        }
-      }
-    });
-  });
-
-  return dictionary;
-}
-
-// Refactored in favor of toDictionary
-
-// function toGenresDictionary(movies) {
-//   const genresDictionary = {};
-
-//   movies.forEach((movie) => {
-//     movie.genres.forEach((genre) => {
-//       if (!genresDictionary[genre.id]) {
-//         genresDictionary[genre.id] = {
-//           name: genre.name,
-//           count: 1,
-//         };
-//       } else {
-//         genresDictionary[genre.id] = {
-//           name: genre.name,
-//           count: genresDictionary[genre.id].count + 1,
-//         }
-//       }
-//     });
-//   });
-
-//   return genresDictionary;
-// }
-
-function zip(movies, keywords) {
-  return Object.keys(movies).map(mId => ({
-    ...movies[mId],
-    ...keywords[mId],
-  }));
-}
-
-function softEval(string, escape) {
+export function softEval(string, escape) {
   if (!string) {
     return escape;
   }
