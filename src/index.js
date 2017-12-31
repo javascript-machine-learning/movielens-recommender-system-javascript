@@ -9,7 +9,7 @@ import prepareRatings from './preparation/ratings';
 import prepareMovies from './preparation/movies';
 import predictWithLinearRegression from './strategies/linearRegression';
 import predictWithContentBased from './strategies/contentBased';
-import predictWithCfUserBased from './strategies/collaborativeFiltering/userBased';
+import { predictWithCfUserBased, predictWithCfItemBased } from './strategies/collaborativeFiltering/userBased';
 
 const ARTIFICIAL_USER_RATINGS = [
   {
@@ -184,10 +184,15 @@ function init([ moviesMetaData, moviesKeywords, ratings ]) {
   console.log('Collaborative-Filtering Prediction ... \n');
 
   console.log('(1) Computing User-Based Cosine Similarity \n');
-  const cfUserBasedRecommendation = predictWithCfUserBased(
+  // const cfUserBasedRecommendation = predictWithCfUserBased(
+  //   ratingsGroupedByUser,
+  //   ratingsGroupedByMovie,
+  //   ME_USER_INDEX
+  // );
+
+  const cfUserBasedRecommendation = predictWithCfItemBased(
     ratingsGroupedByUser,
     ratingsGroupedByMovie,
-    MOVIES_IN_LIST,
     ME_USER_INDEX
   );
 

@@ -13,3 +13,11 @@ export function getCosineSimilarityRowVector(matrix, index) {
     return similarity(matrix[index], matrix[i]);
   });
 }
+
+export function getCosineSimilarityMatrix(matrix) {
+  return matrix.map((row, i) => {
+    return row.map((cell, j) => {
+      return similarity(matrix[i], matrix[j]);
+    });
+  });
+}

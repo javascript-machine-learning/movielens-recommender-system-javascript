@@ -1,21 +1,63 @@
 import math from 'mathjs';
 
-import { getCosineSimilarityRowVector, sortByPrediction } from '../common';
+import {
+  getCosineSimilarityRowVector,
+  getCosineSimilarityMatrix,
+  sortByPrediction,
+} from '../common';
 
-function predictWithCollaborativeFiltering(ratingsGroupedByUser, ratingsGroupedByMovie, MOVIES_IN_LIST, userIndex) {
-  let { userItemMatrix, movieIds } = getUserItemMatrix(ratingsGroupedByUser, ratingsGroupedByMovie);
-  const normalizedUserItemMatrix = getNormalizedUserItemMatrix(userItemMatrix);
+export function predictWithCfItemBased(ratingsGroupedByUser, ratingsGroupedByMovie, userIndex) {
+  let { userItemMatrix, itemUserMatrix, itemUserMovieIds } = getMatrices(ratingsGroupedByUser, ratingsGroupedByMovie);
 
-  const userUserCosineSimilarityRowVector = getCosineSimilarityRowVector(normalizedUserItemMatrix, userIndex);
+  // console.log(itemUserMovieIds.length);
+  // console.log(ratingsByUser.length);
+  // console.log(cosineSimilarityMatrix.length);
+  // console.log(cosineSimilarityMatrix[0].length);
 
-  const ratings = movieIds.map((movieId, movieKey) => {
+  const userRatingsVector = userItemMatrix[userIndex];
+  const cosineSimilarityMatrix = getCosineSimilarityMatrix(itemUserMatrix);
 
-    const coefficients = normalizedUserItemMatrix.reduce((result, user, userKey) => {
+  const ratings = itemUserMatrix.map((otherUserRatings, movieKeyAbsolute) => {
+    const coefficients = otherUserRatings.reduce((result, rating, movieKeyRelative) => {
+
+      let { weightedSum, similaritySum } = result;
+
+      // console.log(cosineSimilarityMatrix[movieKeyAbsolute][movieKeyRelative], rating);
+
+      weightedSum = weightedSum + rating * cosineSimilarityMatrix[movieKeyAbsolute][movieKeyRelative];
+      similaritySum = similaritySum + cosineSimilarityMatrix[movieKeyAbsolute][movieKeyRelative];
+
+      return {
+        weightedSum,
+        similaritySum,
+        movieId: itemUserMovieIds[movieKeyAbsolute],
+      };
+    }, { weightedSum: 0, similaritySum: 0 });
+
+    console.log(coefficients);
+
+    const { weightedSum, similaritySum, movieId } = coefficients;
+    const prediction = weightedSum / similaritySum;
+
+    return { movieId, prediction };
+  });
+  // console.log(ratings);
+  return sortByPrediction(ratings);
+}
+
+export function predictWithCfUserBased(ratingsGroupedByUser, ratingsGroupedByMovie, userIndex) {
+  let { userItemMatrix, userItemMovieIds } = getMatrices(ratingsGroupedByUser, ratingsGroupedByMovie);
+  // const normalizedMatrix = getNormalizedMatrix(userItemMatrix);
+
+  const cosineSimilarityRowVector = getCosineSimilarityRowVector(userItemMatrix, userIndex);
+
+  const ratings = userItemMovieIds.map((movieId, movieKey) => {
+    const coefficients = userItemMatrix.reduce((result, user, userKey) => {
       let movieRating = user[movieKey];
       let { weightedSum, similaritySum } = result;
 
-      weightedSum = weightedSum + movieRating * userUserCosineSimilarityRowVector[userKey];
-      similaritySum = similaritySum + userUserCosineSimilarityRowVector[userKey];
+      weightedSum = weightedSum + movieRating * cosineSimilarityRowVector[userKey];
+      similaritySum = similaritySum + cosineSimilarityRowVector[userKey];
 
       return {
         weightedSum,
@@ -31,33 +73,41 @@ function predictWithCollaborativeFiltering(ratingsGroupedByUser, ratingsGroupedB
   return sortByPrediction(ratings);
 }
 
-export function getNormalizedUserItemMatrix(userItemMatrix) {
-  return userItemMatrix.map(user => {
-    const mean = math.mean(user);
-    return user.map(rating => {
+export function getNormalizedMatrix(matrix) {
+  return matrix.map(row => {
+    const mean = math.mean(row);
+    return row.map(rating => {
       return rating > 0 ? rating - mean : 0;
     });
   });
 }
 
-export function getUserItemMatrix(ratingsGroupedByUser, ratingsGroupedByMovie) {
+export function getMatrices(ratingsGroupedByUser, ratingsGroupedByMovie) {
   const userItemMatrix = Object.keys(ratingsGroupedByUser).map(userKey => {
     return Object.keys(ratingsGroupedByMovie).map(movieKey => {
       return getConditionalRating(ratingsGroupedByUser[userKey][movieKey]);
     });
   });
 
-  // Keep track for later reference
-  const movieIds = Object.keys(ratingsGroupedByMovie).reduce((result, movieId) => {
-    result.push(movieId)
-    return result;
-  }, []);
+  const userItemMovieIds = Object.keys(ratingsGroupedByUser).map(userKey => {
+    return Object.keys(ratingsGroupedByMovie).map(movieKey => {
+      return movieKey;
+    });
+  });
 
-  return { userItemMatrix, movieIds };
+  const itemUserMatrix = Object.keys(ratingsGroupedByMovie).map(movieKey => {
+    return Object.keys(ratingsGroupedByUser).map(userKey => {
+      return getConditionalRating(ratingsGroupedByMovie[movieKey][userKey]);
+    });
+  });
+
+  const itemUserMovieIds = Object.keys(ratingsGroupedByMovie).map(movieKey => {
+    return movieKey;
+  });
+
+  return { userItemMatrix, itemUserMatrix, userItemMovieIds, itemUserMovieIds };
 }
 
 function getConditionalRating(value) {
   return value ? value.rating : 0;
 }
-
-export default predictWithCollaborativeFiltering;
