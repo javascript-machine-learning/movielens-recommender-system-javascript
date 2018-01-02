@@ -8,60 +8,12 @@ import csv from 'fast-csv';
 import prepareRatings from './preparation/ratings';
 import prepareMovies from './preparation/movies';
 import predictWithLinearRegression from './strategies/linearRegression';
-import predictWithContentBased from './strategies/contentBased';
+import predictWithContentBased, { getMovieIndexByTitle } from './strategies/contentBased';
 import { predictWithCfUserBased, predictWithCfItemBased } from './strategies/collaborativeFiltering/userBased';
-
-const ARTIFICIAL_USER_RATINGS = [
-  {
-    userId: '0',
-    movieId: '155', // The Dark Knight
-    rating: '5.0',
-  },
-  {
-    userId: '0',
-    movieId: '49026', // The Dark Knight Rises
-    rating: '4.0',
-  },
-  {
-    userId: '0',
-    movieId: '40662', // Batman: Under the Red Hood
-    rating: '3.0',
-  },
-  {
-    userId: '0',
-    movieId: '58574', // Sherlock Holmes: A Game of Shadows
-    rating: '4.0',
-  },
-  {
-    userId: '0',
-    movieId: '44038', // Lovecraft: Fear of the Unknown
-    rating: '3.0',
-  },
-  {
-    userId: '0',
-    movieId: '415', // Batman & Robin
-    rating: '4.0',
-  },
-  {
-    userId: '0',
-    movieId: '1726', // Iron Man
-    rating: '5.0',
-  },
-  {
-    userId: '0',
-    movieId: '457', // Sissi
-    rating: '1.0',
-  },
-  {
-    userId: '0',
-    movieId: '597', // Titanic
-    rating: '1.0',
-  },
-];
 
 let MOVIES_META_DATA = {};
 let MOVIES_KEYWORDS = {};
-let RATINGS = [...ARTIFICIAL_USER_RATINGS];
+let RATINGS = [];
 
 let ME_USER_INDEX = 0;
 
@@ -135,10 +87,31 @@ function init([ moviesMetaData, moviesKeywords, ratings ]) {
     X,
   } = prepareMovies(moviesMetaData, moviesKeywords);
 
+  let ME_USER_RATINGS = [
+    addUserRating(ME_USER_INDEX, 'The Dark Knight', '5.0', MOVIES_IN_LIST),
+    addUserRating(ME_USER_INDEX, 'The Dark Knight Rises', '4.0', MOVIES_IN_LIST),
+    addUserRating(ME_USER_INDEX, 'Batman: Under the Red Hood', '3.0', MOVIES_IN_LIST),
+    addUserRating(ME_USER_INDEX, 'Sherlock Holmes: A Game of Shadows', '4.0', MOVIES_IN_LIST),
+    addUserRating(ME_USER_INDEX, 'Lovecraft: Fear of the Unknown', '3.0', MOVIES_IN_LIST),
+    addUserRating(ME_USER_INDEX, 'Batman & Robin', '4.0', MOVIES_IN_LIST),
+    addUserRating(ME_USER_INDEX, 'Iron Man', '5.0', MOVIES_IN_LIST),
+    addUserRating(ME_USER_INDEX, 'Sissi', '1.0', MOVIES_IN_LIST),
+    addUserRating(ME_USER_INDEX, 'Titanic', '1.0', MOVIES_IN_LIST),
+    addUserRating(ME_USER_INDEX, 'Inception', '5.0', MOVIES_IN_LIST),
+    addUserRating(ME_USER_INDEX, 'Interstellar', '4.0', MOVIES_IN_LIST),
+    addUserRating(ME_USER_INDEX, 'Forrest Gump', '3.0', MOVIES_IN_LIST),
+    addUserRating(ME_USER_INDEX, 'Fight Club', '4.0', MOVIES_IN_LIST),
+    addUserRating(ME_USER_INDEX, 'Back to the Future', '3.0', MOVIES_IN_LIST),
+    addUserRating(ME_USER_INDEX, 'The Godfather', '4.0', MOVIES_IN_LIST),
+    addUserRating(ME_USER_INDEX, 'Pulp Fiction', '5.0', MOVIES_IN_LIST),
+    addUserRating(ME_USER_INDEX, 'Mean Girls', '1.0', MOVIES_IN_LIST),
+    addUserRating(ME_USER_INDEX, 'The Breakfast Club', '1.0', MOVIES_IN_LIST),
+  ];
+
   const {
     ratingsGroupedByUser,
     ratingsGroupedByMovie,
-  } = prepareRatings(ratings);
+  } = prepareRatings([ ...ME_USER_RATINGS, ...ratings ]);
 
   /* ----------------------------- */
   //  Linear Regression Prediction //
@@ -191,16 +164,25 @@ function init([ moviesMetaData, moviesKeywords, ratings ]) {
   // );
 
   const cfUserBasedRecommendation = predictWithCfItemBased(
+    MOVIES_IN_LIST,
     ratingsGroupedByUser,
     ratingsGroupedByMovie,
     ME_USER_INDEX
   );
 
   console.log('(2) Prediction \n');
-  console.log(sliceAndDice(cfUserBasedRecommendation, MOVIES_BY_ID, 10, true));
+  console.log(sliceAndDice(cfUserBasedRecommendation, MOVIES_BY_ID, 30, true));
 
   console.log('\n');
   console.log('End ...');
+}
+
+export function addUserRating(userId, title, rating, MOVIES_IN_LIST) {
+  return {
+    userId,
+    rating,
+    movieId: getMovieIndexByTitle(MOVIES_IN_LIST, title).id,
+  };
 }
 
 export function sliceAndDice(recommendations, MOVIES_BY_ID, count, onlyTitle) {
