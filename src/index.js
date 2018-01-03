@@ -88,15 +88,16 @@ function init([ moviesMetaData, moviesKeywords, ratings ]) {
   } = prepareMovies(moviesMetaData, moviesKeywords);
 
   let ME_USER_RATINGS = [
-    addUserRating(ME_USER_INDEX, 'The Dark Knight', '5.0', MOVIES_IN_LIST),
-    addUserRating(ME_USER_INDEX, 'The Dark Knight Rises', '4.0', MOVIES_IN_LIST),
-    addUserRating(ME_USER_INDEX, 'Batman: Under the Red Hood', '3.0', MOVIES_IN_LIST),
-    addUserRating(ME_USER_INDEX, 'Sherlock Holmes: A Game of Shadows', '4.0', MOVIES_IN_LIST),
-    addUserRating(ME_USER_INDEX, 'Lovecraft: Fear of the Unknown', '3.0', MOVIES_IN_LIST),
-    addUserRating(ME_USER_INDEX, 'Batman & Robin', '4.0', MOVIES_IN_LIST),
-    addUserRating(ME_USER_INDEX, 'Iron Man', '5.0', MOVIES_IN_LIST),
-    addUserRating(ME_USER_INDEX, 'Sissi', '1.0', MOVIES_IN_LIST),
-    addUserRating(ME_USER_INDEX, 'Titanic', '1.0', MOVIES_IN_LIST),
+    // addUserRating(ME_USER_INDEX, 'The Dark Knight', '5.0', MOVIES_IN_LIST),
+    // addUserRating(ME_USER_INDEX, 'The Dark Knight Rises', '4.0', MOVIES_IN_LIST),
+    // addUserRating(ME_USER_INDEX, 'Batman: Under the Red Hood', '3.0', MOVIES_IN_LIST),
+    // addUserRating(ME_USER_INDEX, 'Sherlock Holmes: A Game of Shadows', '4.0', MOVIES_IN_LIST),
+    // addUserRating(ME_USER_INDEX, 'Lovecraft: Fear of the Unknown', '3.0', MOVIES_IN_LIST),
+    // addUserRating(ME_USER_INDEX, 'Batman & Robin', '4.0', MOVIES_IN_LIST),
+    // addUserRating(ME_USER_INDEX, 'Iron Man', '5.0', MOVIES_IN_LIST),
+    // addUserRating(ME_USER_INDEX, 'Sissi', '1.0', MOVIES_IN_LIST),
+    // addUserRating(ME_USER_INDEX, 'Titanic', '1.0', MOVIES_IN_LIST),
+
     addUserRating(ME_USER_INDEX, 'Inception', '5.0', MOVIES_IN_LIST),
     addUserRating(ME_USER_INDEX, 'Interstellar', '4.0', MOVIES_IN_LIST),
     addUserRating(ME_USER_INDEX, 'Forrest Gump', '3.0', MOVIES_IN_LIST),
