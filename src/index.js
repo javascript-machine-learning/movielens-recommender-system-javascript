@@ -9,13 +9,13 @@ import prepareRatings from './preparation/ratings';
 import prepareMovies from './preparation/movies';
 import predictWithLinearRegression from './strategies/linearRegression';
 import predictWithContentBased, { getMovieIndexByTitle } from './strategies/contentBased';
-import { predictWithCfUserBased, predictWithCfItemBased } from './strategies/collaborativeFiltering/userBased';
+import { predictWithCfUserBased, predictWithCfItemBased } from './strategies/collaborativeFiltering/itemBased';
 
 let MOVIES_META_DATA = {};
 let MOVIES_KEYWORDS = {};
 let RATINGS = [];
 
-let ME_USER_INDEX = 0;
+let ME_USER_ID = 0;
 
 let moviesMetaDataPromise = new Promise((resolve) =>
   fs
@@ -88,25 +88,27 @@ function init([ moviesMetaData, moviesKeywords, ratings ]) {
   } = prepareMovies(moviesMetaData, moviesKeywords);
 
   let ME_USER_RATINGS = [
-    // addUserRating(ME_USER_INDEX, 'The Dark Knight', '5.0', MOVIES_IN_LIST),
-    // addUserRating(ME_USER_INDEX, 'The Dark Knight Rises', '4.0', MOVIES_IN_LIST),
-    // addUserRating(ME_USER_INDEX, 'Batman: Under the Red Hood', '3.0', MOVIES_IN_LIST),
-    // addUserRating(ME_USER_INDEX, 'Sherlock Holmes: A Game of Shadows', '4.0', MOVIES_IN_LIST),
-    // addUserRating(ME_USER_INDEX, 'Lovecraft: Fear of the Unknown', '3.0', MOVIES_IN_LIST),
-    // addUserRating(ME_USER_INDEX, 'Batman & Robin', '4.0', MOVIES_IN_LIST),
-    // addUserRating(ME_USER_INDEX, 'Iron Man', '5.0', MOVIES_IN_LIST),
-    // addUserRating(ME_USER_INDEX, 'Sissi', '1.0', MOVIES_IN_LIST),
-    // addUserRating(ME_USER_INDEX, 'Titanic', '1.0', MOVIES_IN_LIST),
+    // Sample User One
+    addUserRating(ME_USER_ID, 'The Dark Knight', '5.0', MOVIES_IN_LIST),
+    addUserRating(ME_USER_ID, 'The Dark Knight Rises', '4.0', MOVIES_IN_LIST),
+    addUserRating(ME_USER_ID, 'Batman: Under the Red Hood', '3.0', MOVIES_IN_LIST),
+    addUserRating(ME_USER_ID, 'Sherlock Holmes: A Game of Shadows', '4.0', MOVIES_IN_LIST),
+    addUserRating(ME_USER_ID, 'Lovecraft: Fear of the Unknown', '3.0', MOVIES_IN_LIST),
+    addUserRating(ME_USER_ID, 'Batman & Robin', '4.0', MOVIES_IN_LIST),
+    addUserRating(ME_USER_ID, 'Iron Man', '5.0', MOVIES_IN_LIST),
+    addUserRating(ME_USER_ID, 'Sissi', '1.0', MOVIES_IN_LIST),
+    addUserRating(ME_USER_ID, 'Titanic', '1.0', MOVIES_IN_LIST),
 
-    addUserRating(ME_USER_INDEX, 'Inception', '5.0', MOVIES_IN_LIST),
-    addUserRating(ME_USER_INDEX, 'Interstellar', '4.0', MOVIES_IN_LIST),
-    addUserRating(ME_USER_INDEX, 'Forrest Gump', '3.0', MOVIES_IN_LIST),
-    addUserRating(ME_USER_INDEX, 'Fight Club', '4.0', MOVIES_IN_LIST),
-    addUserRating(ME_USER_INDEX, 'Back to the Future', '3.0', MOVIES_IN_LIST),
-    addUserRating(ME_USER_INDEX, 'The Godfather', '4.0', MOVIES_IN_LIST),
-    addUserRating(ME_USER_INDEX, 'Pulp Fiction', '5.0', MOVIES_IN_LIST),
-    addUserRating(ME_USER_INDEX, 'Mean Girls', '1.0', MOVIES_IN_LIST),
-    addUserRating(ME_USER_INDEX, 'The Breakfast Club', '1.0', MOVIES_IN_LIST),
+    // Sample User Two
+    // addUserRating(ME_USER_ID, 'Inception', '5.0', MOVIES_IN_LIST),
+    // addUserRating(ME_USER_ID, 'Interstellar', '4.0', MOVIES_IN_LIST),
+    // addUserRating(ME_USER_ID, 'Forrest Gump', '3.0', MOVIES_IN_LIST),
+    // addUserRating(ME_USER_ID, 'Fight Club', '4.0', MOVIES_IN_LIST),
+    // addUserRating(ME_USER_ID, 'Back to the Future', '3.0', MOVIES_IN_LIST),
+    // addUserRating(ME_USER_ID, 'The Godfather', '4.0', MOVIES_IN_LIST),
+    // addUserRating(ME_USER_ID, 'Pulp Fiction', '5.0', MOVIES_IN_LIST),
+    // addUserRating(ME_USER_ID, 'Mean Girls', '1.0', MOVIES_IN_LIST),
+    // addUserRating(ME_USER_ID, 'The Breakfast Club', '1.0', MOVIES_IN_LIST),
   ];
 
   const {
@@ -124,7 +126,7 @@ function init([ moviesMetaData, moviesKeywords, ratings ]) {
   console.log('Linear Regression Prediction ... \n');
 
   console.log('(1) Training \n');
-  const meUserRatings = ratingsGroupedByUser[ME_USER_INDEX];
+  const meUserRatings = ratingsGroupedByUser[ME_USER_ID];
   const linearRegressionBasedRecommendation = predictWithLinearRegression(X, MOVIES_IN_LIST, meUserRatings);
 
   console.log('(2) Prediction \n');
@@ -152,37 +154,36 @@ function init([ moviesMetaData, moviesKeywords, ratings ]) {
 
   /* ----------------------------------- */
   //  Collaborative-Filtering Prediction //
-  //             User-Based              //
+  //             Item-Based              //
   /* ----------------------------------- */
 
   console.log('Collaborative-Filtering Prediction ... \n');
 
-  console.log('(1) Computing User-Based Cosine Similarity \n');
-  // const cfUserBasedRecommendation = predictWithCfUserBased(
-  //   ratingsGroupedByUser,
-  //   ratingsGroupedByMovie,
-  //   ME_USER_INDEX
-  // );
+  console.log('(1) Computing Item-Based Cosine Similarity \n');
 
-  const cfUserBasedRecommendation = predictWithCfItemBased(
-    MOVIES_IN_LIST,
+  const cfItemBasedRecommendation = predictWithCfItemBased(
     ratingsGroupedByUser,
     ratingsGroupedByMovie,
-    ME_USER_INDEX
+    ME_USER_ID
   );
 
   console.log('(2) Prediction \n');
-  console.log(sliceAndDice(cfUserBasedRecommendation, MOVIES_BY_ID, 30, true));
+  console.log(sliceAndDice(cfItemBasedRecommendation, MOVIES_BY_ID, 30, true));
 
   console.log('\n');
   console.log('End ...');
 }
 
-export function addUserRating(userId, title, rating, MOVIES_IN_LIST) {
+// Utility
+
+export function addUserRating(userId, searchTitle, rating, MOVIES_IN_LIST) {
+  const { id, title } = getMovieIndexByTitle(MOVIES_IN_LIST, searchTitle);
+
   return {
     userId,
     rating,
-    movieId: getMovieIndexByTitle(MOVIES_IN_LIST, title).id,
+    movieId: id,
+    title,
   };
 }
 
