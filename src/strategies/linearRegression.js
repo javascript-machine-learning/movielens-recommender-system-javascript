@@ -1,6 +1,6 @@
 import math from 'mathjs';
 
-import { sortByPrediction } from './common';
+import { sortByScore } from './common';
 
 const LEARNING_RATE = 0.03;
 const LEARNING_ITERATIONS = 750;
@@ -55,11 +55,11 @@ function predictWithLinearRegression(X, MOVIES_IN_LIST, ratings) {
   // Enrich the vector to convey all information
   // Use references from before which we kept track of
   predictedRatings = predictedRatings.map((rating, key) => ({
-    prediction: rating[0],
+    score: rating[0],
     movieId: test.references[key],
   }));
 
-  return sortByPrediction(predictedRatings);
+  return sortByScore(predictedRatings);
 }
 
 export function gradientDescent(X, y, theta, ALPHA, ITERATIONS) {

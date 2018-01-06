@@ -15,39 +15,36 @@ function prepareMovies(moviesMetaData, moviesKeywords) {
   // Keep a map of movies for later reference
   let MOVIES_BY_ID = MOVIES_IN_LIST.reduce(byId, {});
 
-  if (false) {
-    console.log('(2) Creating Dictionaries');
-    // Preparing dictionaries for feature extraction
-    let DICTIONARIES = prepareDictionaries(MOVIES_IN_LIST);
+  console.log('(2) Creating Dictionaries');
+  // Preparing dictionaries for feature extraction
+  let DICTIONARIES = prepareDictionaries(MOVIES_IN_LIST);
 
-    // Feature Extraction:
-    // Map different types to numerical values (e.g. adult to 0 or 1)
-    // Map dictionaries to partial feature vectors
-    console.log('(3) Extracting Features');
-    let X = MOVIES_IN_LIST.map(toFeaturizedMovies(DICTIONARIES));
+  // Feature Extraction:
+  // Map different types to numerical values (e.g. adult to 0 or 1)
+  // Map dictionaries to partial feature vectors
+  console.log('(3) Extracting Features');
+  let X = MOVIES_IN_LIST.map(toFeaturizedMovies(DICTIONARIES));
 
-    // Extract a couple of valuable coefficients
-    // Can be used in a later stage (e.g. feature scaling)
-    console.log('(4) Calculating Coefficients');
-    let { means, ranges } = getCoefficients(X);
+  // Extract a couple of valuable coefficients
+  // Can be used in a later stage (e.g. feature scaling)
+  console.log('(4) Calculating Coefficients');
+  let { means, ranges } = getCoefficients(X);
 
-    // Synthesize Features:
-    // Missing features (such as budget, release, revenue)
-    // can be synthesized with the mean of the features
-    console.log('(5) Synthesizing Features');
-    X = synthesizeFeatures(X, means, [0, 1, 2, 3, 4, 5, 6]);
+  // Synthesize Features:
+  // Missing features (such as budget, release, revenue)
+  // can be synthesized with the mean of the features
+  console.log('(5) Synthesizing Features');
+  X = synthesizeFeatures(X, means, [0, 1, 2, 3, 4, 5, 6]);
 
-    // Feature Scaling:
-    // Normalize features based on mean and range vectors
-    console.log('(6) Scaling Features \n');
-    X = scaleFeatures(X, means, ranges);
-
-  }
+  // Feature Scaling:
+  // Normalize features based on mean and range vectors
+  console.log('(6) Scaling Features \n');
+  X = scaleFeatures(X, means, ranges);
 
   return {
     MOVIES_BY_ID,
     MOVIES_IN_LIST,
-    X: {},
+    X,
   };
 }
 

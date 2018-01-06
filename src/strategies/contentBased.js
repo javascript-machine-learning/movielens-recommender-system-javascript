@@ -1,4 +1,4 @@
-import { getCosineSimilarityRowVector, sortByPrediction } from './common';
+import { getCosineSimilarityRowVector, sortByScore, getMovieIndexByTitle } from './common';
 
 function predictWithContentBased(X, MOVIES_IN_LIST, title) {
   const { index } = getMovieIndexByTitle(MOVIES_IN_LIST, title);
@@ -10,22 +10,11 @@ function predictWithContentBased(X, MOVIES_IN_LIST, title) {
   // Use references from before which we kept track of
   const contentBasedRecommendation = cosineSimilarityRowVector
     .map((value, key) => ({
-      prediction: value,
+      score: value,
       movieId: MOVIES_IN_LIST[key].id,
     }));
 
-  return sortByPrediction(contentBasedRecommendation);
-}
-
-export function getMovieIndexByTitle(MOVIES_IN_LIST, query) {
-  const index = MOVIES_IN_LIST.map(movie => movie.title).indexOf(query);
-
-  if (!index) {
-    throw new Error('Movie not found');
-  }
-
-  const { title, id } = MOVIES_IN_LIST[index];
-  return { index, title, id };
+  return sortByScore(contentBasedRecommendation);
 }
 
 export default predictWithContentBased;

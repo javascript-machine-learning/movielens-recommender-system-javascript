@@ -1,6 +1,7 @@
 // https://www.kaggle.com/rounakbanik/the-movies-dataset/data
-// Exercise: Use credits data with crew and cast too
-// Exercise: Make feature more weighted based on popularity or actors
+// Exercise: Content-based - Include credits data with crew and cast too
+// Exercise: Content-based - Make features weighted based on popularity or actors
+// Exercise: Collaborative Filtering - Model-based CF with SVD
 
 import fs from 'fs';
 import csv from 'fast-csv';
@@ -8,8 +9,9 @@ import csv from 'fast-csv';
 import prepareRatings from './preparation/ratings';
 import prepareMovies from './preparation/movies';
 import predictWithLinearRegression from './strategies/linearRegression';
-import predictWithContentBased, { getMovieIndexByTitle } from './strategies/contentBased';
-import { predictWithCfUserBased, predictWithCfItemBased } from './strategies/collaborativeFiltering/itemBased';
+import predictWithContentBased from './strategies/contentBased';
+import { predictWithCfUserBased, predictWithCfItemBased } from './strategies/collaborativeFiltering';
+import { getMovieIndexByTitle } from './strategies/common';
 
 let MOVIES_META_DATA = {};
 let MOVIES_KEYWORDS = {};
@@ -88,27 +90,15 @@ function init([ moviesMetaData, moviesKeywords, ratings ]) {
   } = prepareMovies(moviesMetaData, moviesKeywords);
 
   let ME_USER_RATINGS = [
-    // Sample User One
-    addUserRating(ME_USER_ID, 'The Dark Knight', '5.0', MOVIES_IN_LIST),
-    addUserRating(ME_USER_ID, 'The Dark Knight Rises', '4.0', MOVIES_IN_LIST),
-    addUserRating(ME_USER_ID, 'Batman: Under the Red Hood', '3.0', MOVIES_IN_LIST),
-    addUserRating(ME_USER_ID, 'Sherlock Holmes: A Game of Shadows', '4.0', MOVIES_IN_LIST),
-    addUserRating(ME_USER_ID, 'Lovecraft: Fear of the Unknown', '3.0', MOVIES_IN_LIST),
-    addUserRating(ME_USER_ID, 'Batman & Robin', '4.0', MOVIES_IN_LIST),
-    addUserRating(ME_USER_ID, 'Iron Man', '5.0', MOVIES_IN_LIST),
+    addUserRating(ME_USER_ID, 'Terminator 3: Rise of the Machines', '5.0', MOVIES_IN_LIST),
+    addUserRating(ME_USER_ID, 'Jarhead', '4.0', MOVIES_IN_LIST),
+    addUserRating(ME_USER_ID, 'Back to the Future Part II', '3.0', MOVIES_IN_LIST),
+    addUserRating(ME_USER_ID, 'Jurassic Park', '4.0', MOVIES_IN_LIST),
+    addUserRating(ME_USER_ID, 'Reservoir Dogs', '3.0', MOVIES_IN_LIST),
+    addUserRating(ME_USER_ID, 'Men in Black II', '3.0', MOVIES_IN_LIST),
+    addUserRating(ME_USER_ID, 'Bad Boys II', '5.0', MOVIES_IN_LIST),
     addUserRating(ME_USER_ID, 'Sissi', '1.0', MOVIES_IN_LIST),
     addUserRating(ME_USER_ID, 'Titanic', '1.0', MOVIES_IN_LIST),
-
-    // Sample User Two
-    // addUserRating(ME_USER_ID, 'Inception', '5.0', MOVIES_IN_LIST),
-    // addUserRating(ME_USER_ID, 'Interstellar', '4.0', MOVIES_IN_LIST),
-    // addUserRating(ME_USER_ID, 'Forrest Gump', '3.0', MOVIES_IN_LIST),
-    // addUserRating(ME_USER_ID, 'Fight Club', '4.0', MOVIES_IN_LIST),
-    // addUserRating(ME_USER_ID, 'Back to the Future', '3.0', MOVIES_IN_LIST),
-    // addUserRating(ME_USER_ID, 'The Godfather', '4.0', MOVIES_IN_LIST),
-    // addUserRating(ME_USER_ID, 'Pulp Fiction', '5.0', MOVIES_IN_LIST),
-    // addUserRating(ME_USER_ID, 'Mean Girls', '1.0', MOVIES_IN_LIST),
-    // addUserRating(ME_USER_ID, 'The Breakfast Club', '1.0', MOVIES_IN_LIST),
   ];
 
   const {
@@ -121,9 +111,8 @@ function init([ moviesMetaData, moviesKeywords, ratings ]) {
   //        Gradient Descent       //
   /* ----------------------------- */
 
-  /*** UNCOMMENT TO USE RECOMMENDER STRATEGY
-
-  console.log('Linear Regression Prediction ... \n');
+  console.log('\n');
+  console.log('(A) Linear Regression Prediction ... \n');
 
   console.log('(1) Training \n');
   const meUserRatings = ratingsGroupedByUser[ME_USER_ID];
@@ -132,16 +121,13 @@ function init([ moviesMetaData, moviesKeywords, ratings ]) {
   console.log('(2) Prediction \n');
   console.log(sliceAndDice(linearRegressionBasedRecommendation, MOVIES_BY_ID, 10, true));
 
-  ***/
-
   /* ------------------------- */
   //  Content-Based Prediction //
   //  Cosine Similarity Matrix //
   /* ------------------------- */
 
-  /*** UNCOMMENT TO USE RECOMMENDER STRATEGY
-
-  console.log('Content-Based Prediction ... \n');
+  console.log('\n');
+  console.log('(B) Content-Based Prediction ... \n');
 
   console.log('(1) Computing Cosine Similarity \n');
   const title = 'Batman Begins';
@@ -150,14 +136,32 @@ function init([ moviesMetaData, moviesKeywords, ratings ]) {
   console.log(`(2) Prediction based on "${title}" \n`);
   console.log(sliceAndDice(contentBasedRecommendation, MOVIES_BY_ID, 10, true));
 
-  ***/
+  /* ----------------------------------- */
+  //  Collaborative-Filtering Prediction //
+  //             User-Based              //
+  /* ----------------------------------- */
+
+  console.log('\n');
+  console.log('(C) Collaborative-Filtering (User-Based) Prediction ... \n');
+
+  console.log('(1) Computing User-Based Cosine Similarity \n');
+
+  const cfUserBasedRecommendation = predictWithCfUserBased(
+    ratingsGroupedByUser,
+    ratingsGroupedByMovie,
+    ME_USER_ID
+  );
+
+  console.log('(2) Prediction \n');
+  console.log(sliceAndDice(cfUserBasedRecommendation, MOVIES_BY_ID, 10, true));
 
   /* ----------------------------------- */
   //  Collaborative-Filtering Prediction //
   //             Item-Based              //
   /* ----------------------------------- */
 
-  console.log('Collaborative-Filtering Prediction ... \n');
+  console.log('\n');
+  console.log('(C) Collaborative-Filtering (Item-Based) Prediction ... \n');
 
   console.log('(1) Computing Item-Based Cosine Similarity \n');
 
@@ -168,7 +172,7 @@ function init([ moviesMetaData, moviesKeywords, ratings ]) {
   );
 
   console.log('(2) Prediction \n');
-  console.log(sliceAndDice(cfItemBasedRecommendation, MOVIES_BY_ID, 30, true));
+  console.log(sliceAndDice(cfItemBasedRecommendation, MOVIES_BY_ID, 10, true));
 
   console.log('\n');
   console.log('End ...');
@@ -191,8 +195,8 @@ export function sliceAndDice(recommendations, MOVIES_BY_ID, count, onlyTitle) {
   recommendations = recommendations.filter(recommendation => MOVIES_BY_ID[recommendation.movieId]);
 
   recommendations = onlyTitle
-    ? recommendations.map(mr => ({ title: MOVIES_BY_ID[mr.movieId].title, prediction: mr.prediction }))
-    : recommendations.map(mr => ({ movie: MOVIES_BY_ID[mr.movieId], prediction: mr.prediction }));
+    ? recommendations.map(mr => ({ title: MOVIES_BY_ID[mr.movieId].title, score: mr.score }))
+    : recommendations.map(mr => ({ movie: MOVIES_BY_ID[mr.movieId], score: mr.score }));
 
   return recommendations
     .slice(0, count);
