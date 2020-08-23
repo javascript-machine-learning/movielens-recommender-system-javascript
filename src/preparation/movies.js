@@ -78,7 +78,9 @@ export function prepareDictionaries(movies) {
 export function scaleFeatures(X, means, ranges) {
   return X.map((row) => {
     return row.map((feature, key) => {
-      return (feature - means[key]) / ranges[key];
+      let z = (feature - means[key]) / ranges[key];
+      if(isNaN(z)){return 0;}
+      return z;
     });
   });
 };
