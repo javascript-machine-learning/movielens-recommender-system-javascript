@@ -21,21 +21,21 @@ let ME_USER_ID = 0;
 
 let moviesMetaDataPromise = new Promise((resolve) =>
   fs
-    .createReadStream('./src/data/movies_metadata.csv')
+    .createReadStream('./src/data/MovieLens/movies_metadata.csv')
     .pipe(csv({ headers: true }))
     .on('data', fromMetaDataFile)
     .on('end', () => resolve(MOVIES_META_DATA)));
 
 let moviesKeywordsPromise = new Promise((resolve) =>
   fs
-    .createReadStream('./src/data/keywords.csv')
+    .createReadStream('./src/data/MovieLens/keywords.csv')
     .pipe(csv({ headers: true }))
     .on('data', fromKeywordsFile)
     .on('end', () => resolve(MOVIES_KEYWORDS)));
 
 let ratingsPromise = new Promise((resolve) =>
   fs
-    .createReadStream('./src/data/ratings_small.csv')
+    .createReadStream('./src/data/MovieLens/ratings_small.csv')
     .pipe(csv({ headers: true }))
     .on('data', fromRatingsFile)
     .on('end', () => resolve(RATINGS)));
@@ -91,13 +91,12 @@ function init([ moviesMetaData, moviesKeywords, ratings ]) {
 
   let ME_USER_RATINGS = [
     addUserRating(ME_USER_ID, 'Terminator 3: Rise of the Machines', '5.0', MOVIES_IN_LIST),
-    addUserRating(ME_USER_ID, 'Jarhead', '4.0', MOVIES_IN_LIST),
+    addUserRating(ME_USER_ID, 'Kill Bill: Vol. 1', '4.0', MOVIES_IN_LIST),
     addUserRating(ME_USER_ID, 'Back to the Future Part II', '3.0', MOVIES_IN_LIST),
-    addUserRating(ME_USER_ID, 'Jurassic Park', '4.0', MOVIES_IN_LIST),
+    addUserRating(ME_USER_ID, 'Casino Royale', '4.0', MOVIES_IN_LIST),
     addUserRating(ME_USER_ID, 'Reservoir Dogs', '3.0', MOVIES_IN_LIST),
     addUserRating(ME_USER_ID, 'Men in Black II', '3.0', MOVIES_IN_LIST),
     addUserRating(ME_USER_ID, 'Bad Boys II', '5.0', MOVIES_IN_LIST),
-    addUserRating(ME_USER_ID, 'Sissi', '1.0', MOVIES_IN_LIST),
     addUserRating(ME_USER_ID, 'Titanic', '1.0', MOVIES_IN_LIST),
   ];
 
