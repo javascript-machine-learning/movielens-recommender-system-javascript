@@ -3,6 +3,7 @@ import math from 'mathjs';
 import { sortByScore } from './common';
 
 const LEARNING_RATE = 0.03;
+const LAMBDA = 0.01;
 const LEARNING_ITERATIONS = 750;
 
 function predictWithLinearRegression(X, MOVIES_IN_LIST, ratings) {
@@ -46,6 +47,7 @@ function predictWithLinearRegression(X, MOVIES_IN_LIST, ratings) {
     training.y,
     theta,
     LEARNING_RATE,
+    LAMBDA,
     LEARNING_ITERATIONS
   );
 
@@ -62,20 +64,21 @@ function predictWithLinearRegression(X, MOVIES_IN_LIST, ratings) {
   return sortByScore(predictedRatings);
 }
 
-export function gradientDescent(X, y, theta, ALPHA, ITERATIONS) {
+export function gradientDescent(X, y, theta, ALPHA, LAMBDA, ITERATIONS) {
   const m = y.length;
 
   for (let i = 0; i < ITERATIONS; i++) {
-    theta = math.eval(`theta - ALPHA / m * ((X * theta - y)' * X)'`, {
+    theta = math.eval(`theta * (1 - (ALPHA * LAMBDA / m)) - ALPHA / m * ((X * theta - y)' * X)'`, {
       theta,
       ALPHA,
+      LAMBDA,
       m,
       X,
       y,
     });
 
     if (i % 50 === 0) {
-      const cost = computeCost(X, y, theta);
+      const cost = computeCost(X, y, theta, LAMBDA);
       console.log(`Cost after ${i} of trained ${ITERATIONS}: ${cost}`);
     }
   }
@@ -91,7 +94,7 @@ export function getPredictedRatings(theta, X) {
   })
 }
 
-export function computeCost(X, y, theta) {
+export function computeCost(X, y, theta, LAMBDA) {
   let m = y.length;
 
   let predictions = math.eval('X * theta', {
@@ -104,9 +107,19 @@ export function computeCost(X, y, theta) {
     y,
   });
 
-  let J = math.eval(`1 / (2 * m) * sum(sqrErrors)`, {
+  let sqrTheta = math.eval('(theta).^2', {
+    theta
+  });
+  let thetaZero = theta[0]
+  sqrTheta[0] = thetaZero
+  
+
+  let J = math.eval(`1 / (2 * m) * (sum(sqrErrors) + LAMBDA * (sum(sqrTheta) - thetaZero))`, {
     m,
     sqrErrors,
+    LAMBDA,
+    sqrTheta,
+    thetaZero
   });
 
   return J;

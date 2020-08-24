@@ -4,9 +4,13 @@
 
 **New Update**
 
+- Added Regularized Linear Regression .
+
+  > Further reading : [Overfitting and Regularization](https://machinelearningmedium.com/2017/09/08/overfitting-and-regularization/)
+
 - Added [YTS Movies](https://www.kaggle.com/miladnourizade/ytsyifytorrent-movies) which is collected from official YIFY torrent movies(yts.am).
 
-> YTS movies dataset is available just for content based recommendation .
+  > YTS movies dataset is available just for content based recommendation .
 
 A recommender system in JavaScript built with NodeJs. It uses the popular [MovieLens](https://www.kaggle.com/rounakbanik/the-movies-dataset/data) database which includes information about movies and ratings of users. The recommender system implements the following recommendation strategies:
 
