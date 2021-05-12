@@ -19,7 +19,7 @@
   "dependencies": {
     "compute-cosine-similarity": "^1.0.0",
     "fast-csv": "^2.4.1",
-    "mathjs": "^3.18.0",
+    "mathjs": "^7.5.1",
     "natural": "^0.5.4"
   }
 }
